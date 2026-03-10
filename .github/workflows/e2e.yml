@@ -1,0 +1,226 @@
+name: E2E Install-Uninstall Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e-openclaw:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build KillClaws
+        run: go build -o killclaws${{ matrix.os == 'windows-latest' && '.exe' || '' }} ./cmd/killclaws
+
+      # --- Pre-install scan: should detect nothing ---
+      - name: Pre-install scan
+        run: ./killclaws${{ matrix.os == 'windows-latest' && '.exe' || '' }} scan --json
+
+      # --- Install OpenClaw ---
+      - name: Install OpenClaw via npm
+        run: npm install -g openclaw@latest
+        continue-on-error: true
+
+      - name: Create fake OpenClaw state directory
+        shell: bash
+        run: |
+          mkdir -p ~/.openclaw
+          echo '{"test": true}' > ~/.openclaw/openclaw.json
+          mkdir -p ~/.openclaw/workspace
+          echo 'test workspace' > ~/.openclaw/workspace/test.md
+
+      # --- Post-install scan: should detect OpenClaw ---
+      - name: Post-install scan
+        run: ./killclaws${{ matrix.os == 'windows-latest' && '.exe' || '' }} scan
+
+      # --- Run KillClaws uninstall ---
+      - name: Run KillClaws (dry-run)
+        run: ./killclaws${{ matrix.os == 'windows-latest' && '.exe' || '' }} --dry-run --yes
+
+      - name: Run KillClaws (actual uninstall)
+        run: ./killclaws${{ matrix.os == 'windows-latest' && '.exe' || '' }} --yes --verbose
+
+      # --- Verify clean removal ---
+      - name: Verify state directory removed
+        shell: bash
+        run: |
+          if [ -d "$HOME/.openclaw" ]; then
+            echo "FAIL: ~/.openclaw still exists"
+            ls -la ~/.openclaw/
+            exit 1
+          fi
+          echo "PASS: ~/.openclaw removed"
+
+      - name: Verify npm package removed
+        shell: bash
+        run: |
+          if npm list -g openclaw 2>/dev/null | grep -q openclaw; then
+            echo "FAIL: openclaw still in npm global"
+            exit 1
+          fi
+          echo "PASS: openclaw npm package removed"
+
+      - name: Post-uninstall scan
+        run: ./killclaws${{ matrix.os == 'windows-latest' && '.exe' || '' }} scan --json
+
+  e2e-zeroclaw-mock:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build KillClaws
+        run: go build -o killclaws ./cmd/killclaws
+
+      # Create fake ZeroClaw installation
+      - name: Create mock ZeroClaw
+        run: |
+          mkdir -p ~/.zeroclaw
+          echo '{"version": "0.1.0"}' > ~/.zeroclaw/config.json
+
+      - name: Scan should detect ZeroClaw
+        run: ./killclaws scan
+
+      - name: Remove ZeroClaw
+        run: ./killclaws --yes --only zeroclaw --verbose
+
+      - name: Verify removal
+        run: |
+          if [ -d "$HOME/.zeroclaw" ]; then
+            echo "FAIL: ~/.zeroclaw still exists"
+            exit 1
+          fi
+          echo "PASS: ZeroClaw removed"
+
+  e2e-picoclaw-mock:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build KillClaws
+        run: go build -o killclaws ./cmd/killclaws
+
+      # Create fake PicoClaw installation
+      - name: Create mock PicoClaw
+        run: |
+          mkdir -p ~/.picoclaw
+          echo 'picoclaw config' > ~/.picoclaw/config.toml
+
+      - name: Scan should detect PicoClaw
+        run: ./killclaws scan
+
+      - name: Remove PicoClaw
+        run: ./killclaws --yes --only picoclaw --verbose
+
+      - name: Verify removal
+        run: |
+          if [ -d "$HOME/.picoclaw" ]; then
+            echo "FAIL: ~/.picoclaw still exists"
+            exit 1
+          fi
+          echo "PASS: PicoClaw removed"
+
+  e2e-legacy-paths:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build KillClaws
+        run: go build -o killclaws ./cmd/killclaws
+
+      # Create legacy ClawdBot/Moltbot directories
+      - name: Create legacy directories
+        run: |
+          mkdir -p ~/.clawdbot
+          echo 'legacy clawdbot' > ~/.clawdbot/config.json
+          mkdir -p ~/.molthub
+          echo 'legacy moltbot' > ~/.molthub/config.json
+          mkdir -p ~/clawd
+          echo 'legacy workspace' > ~/clawd/test.md
+
+      - name: Scan should detect OpenClaw (legacy paths)
+        run: ./killclaws scan
+
+      - name: Remove all
+        run: ./killclaws --yes --verbose
+
+      - name: Verify legacy paths removed
+        run: |
+          FAIL=0
+          for dir in ~/.clawdbot ~/.molthub ~/clawd; do
+            if [ -d "$dir" ]; then
+              echo "FAIL: $dir still exists"
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" -eq 1 ]; then exit 1; fi
+          echo "PASS: All legacy paths removed"
+
+  e2e-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build KillClaws
+        run: go build -o killclaws ./cmd/killclaws
+
+      - name: Create test data
+        run: |
+          mkdir -p ~/.openclaw
+          echo 'test' > ~/.openclaw/test.json
+
+      - name: Run dry-run
+        run: ./killclaws --dry-run --yes
+
+      - name: Verify nothing was removed
+        run: |
+          if [ ! -d "$HOME/.openclaw" ]; then
+            echo "FAIL: dry-run should not remove anything"
+            exit 1
+          fi
+          echo "PASS: dry-run preserved files"
+
+      - name: Cleanup
+        run: rm -rf ~/.openclaw
