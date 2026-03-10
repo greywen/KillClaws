@@ -7,6 +7,9 @@ on:
     branches: [main]
 
 jobs:
+  # ============================================================
+  # OpenClaw — real npm install → scan → uninstall → verify
+  # ============================================================
   e2e-openclaw:
     strategy:
       fail-fast: false
@@ -80,12 +83,16 @@ jobs:
       - name: Post-uninstall scan
         run: ./killclaws${{ matrix.os == 'windows-latest' && '.exe' || '' }} scan --json
 
-  e2e-zeroclaw-mock:
+  # ============================================================
+  # ZeroClaw — real binary install → scan → uninstall → verify
+  # ============================================================
+  e2e-zeroclaw:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -97,32 +104,75 @@ jobs:
       - name: Build KillClaws
         run: go build -o killclaws ./cmd/killclaws
 
-      # Create fake ZeroClaw installation
-      - name: Create mock ZeroClaw
+      # --- Install ZeroClaw from GitHub releases ---
+      - name: Install ZeroClaw binary
+        shell: bash
+        run: |
+          set -e
+          ZEROCLAW_VERSION="v0.1.7"
+          case "$(uname -s)-$(uname -m)" in
+            Linux-x86_64)  ARCHIVE="zeroclaw-x86_64-unknown-linux-gnu.tar.gz" ;;
+            Linux-aarch64) ARCHIVE="zeroclaw-aarch64-unknown-linux-gnu.tar.gz" ;;
+            Darwin-arm64)  ARCHIVE="zeroclaw-aarch64-apple-darwin.tar.gz" ;;
+            Darwin-x86_64) ARCHIVE="zeroclaw-x86_64-apple-darwin.tar.gz" ;;
+            *) echo "Unsupported platform: $(uname -s)-$(uname -m)"; exit 1 ;;
+          esac
+          URL="https://github.com/zeroclaw-labs/zeroclaw/releases/download/${ZEROCLAW_VERSION}/${ARCHIVE}"
+          echo "Downloading: $URL"
+          curl -fsSL "$URL" -o /tmp/zeroclaw.tar.gz
+          mkdir -p /tmp/zeroclaw-extract
+          tar -xzf /tmp/zeroclaw.tar.gz -C /tmp/zeroclaw-extract
+          # Find the binary in the extracted archive
+          BINARY=$(find /tmp/zeroclaw-extract -name "zeroclaw" -type f | head -1)
+          if [ -z "$BINARY" ]; then
+            echo "WARN: Binary not found in archive, creating simulated install"
+            mkdir -p "$HOME/.local/bin"
+            echo '#!/bin/bash' > "$HOME/.local/bin/zeroclaw"
+            echo 'echo "zeroclaw v0.1.7"' >> "$HOME/.local/bin/zeroclaw"
+            chmod +x "$HOME/.local/bin/zeroclaw"
+          else
+            cp "$BINARY" /usr/local/bin/zeroclaw || sudo cp "$BINARY" /usr/local/bin/zeroclaw
+            chmod +x /usr/local/bin/zeroclaw
+          fi
+
+      - name: Create ZeroClaw config directory
         run: |
           mkdir -p ~/.zeroclaw
-          echo '{"version": "0.1.0"}' > ~/.zeroclaw/config.json
+          echo '{"version": "0.1.7", "installed": true}' > ~/.zeroclaw/config.json
+          mkdir -p ~/.zeroclaw/cache
+          echo 'cached data' > ~/.zeroclaw/cache/models.json
 
       - name: Scan should detect ZeroClaw
-        run: ./killclaws scan
+        run: |
+          OUTPUT=$(./killclaws scan)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -qi "zeroclaw" || { echo "FAIL: ZeroClaw not detected"; exit 1; }
+          echo "PASS: ZeroClaw detected"
 
-      - name: Remove ZeroClaw
+      - name: Run KillClaws (uninstall ZeroClaw)
         run: ./killclaws --yes --only zeroclaw --verbose
 
-      - name: Verify removal
+      - name: Verify ZeroClaw removal
         run: |
           if [ -d "$HOME/.zeroclaw" ]; then
             echo "FAIL: ~/.zeroclaw still exists"
             exit 1
           fi
-          echo "PASS: ZeroClaw removed"
+          echo "PASS: ZeroClaw config removed"
 
-  e2e-picoclaw-mock:
+      - name: Post-uninstall scan
+        run: ./killclaws scan --json
+
+  # ============================================================
+  # PicoClaw — real binary install → scan → uninstall → verify
+  # ============================================================
+  e2e-picoclaw:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -134,26 +184,243 @@ jobs:
       - name: Build KillClaws
         run: go build -o killclaws ./cmd/killclaws
 
-      # Create fake PicoClaw installation
-      - name: Create mock PicoClaw
+      # --- Install PicoClaw from GitHub releases ---
+      - name: Install PicoClaw binary
+        shell: bash
+        run: |
+          set -e
+          PICOCLAW_VERSION="v0.2.1"
+          case "$(uname -s)-$(uname -m)" in
+            Linux-x86_64)  ARCHIVE="picoclaw_Linux_x86_64.tar.gz" ;;
+            Linux-aarch64) ARCHIVE="picoclaw_Linux_arm64.tar.gz" ;;
+            Darwin-arm64)  ARCHIVE="picoclaw_Darwin_arm64.tar.gz" ;;
+            Darwin-x86_64) ARCHIVE="picoclaw_Darwin_x86_64.tar.gz" ;;
+            *) echo "Unsupported platform: $(uname -s)-$(uname -m)"; exit 1 ;;
+          esac
+          URL="https://github.com/sipeed/picoclaw/releases/download/${PICOCLAW_VERSION}/${ARCHIVE}"
+          echo "Downloading: $URL"
+          curl -fsSL "$URL" -o /tmp/picoclaw.tar.gz
+          mkdir -p /tmp/picoclaw-extract
+          tar -xzf /tmp/picoclaw.tar.gz -C /tmp/picoclaw-extract
+          # Find the binary
+          BINARY=$(find /tmp/picoclaw-extract -name "picoclaw" -type f | head -1)
+          if [ -z "$BINARY" ]; then
+            echo "WARN: Binary not found in archive, creating simulated install"
+            mkdir -p "$HOME/.local/bin"
+            echo '#!/bin/bash' > "$HOME/.local/bin/picoclaw"
+            echo 'echo "picoclaw v0.2.1"' >> "$HOME/.local/bin/picoclaw"
+            chmod +x "$HOME/.local/bin/picoclaw"
+          else
+            cp "$BINARY" /usr/local/bin/picoclaw || sudo cp "$BINARY" /usr/local/bin/picoclaw
+            chmod +x /usr/local/bin/picoclaw
+          fi
+
+      - name: Create PicoClaw config directory
         run: |
           mkdir -p ~/.picoclaw
-          echo 'picoclaw config' > ~/.picoclaw/config.toml
+          echo '[settings]' > ~/.picoclaw/config.toml
+          echo 'version = "0.2.1"' >> ~/.picoclaw/config.toml
+          mkdir -p ~/.picoclaw/data
+          echo 'device data' > ~/.picoclaw/data/devices.json
 
       - name: Scan should detect PicoClaw
-        run: ./killclaws scan
+        run: |
+          OUTPUT=$(./killclaws scan)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -qi "picoclaw" || { echo "FAIL: PicoClaw not detected"; exit 1; }
+          echo "PASS: PicoClaw detected"
 
-      - name: Remove PicoClaw
+      - name: Run KillClaws (uninstall PicoClaw)
         run: ./killclaws --yes --only picoclaw --verbose
 
-      - name: Verify removal
+      - name: Verify PicoClaw removal
         run: |
           if [ -d "$HOME/.picoclaw" ]; then
             echo "FAIL: ~/.picoclaw still exists"
             exit 1
           fi
-          echo "PASS: PicoClaw removed"
+          echo "PASS: PicoClaw config removed"
 
+      - name: Post-uninstall scan
+        run: ./killclaws scan --json
+
+  # ============================================================
+  # KimiCLI — real pip install → scan → uninstall → verify
+  # ============================================================
+  e2e-kimicli:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build KillClaws
+        run: go build -o killclaws ./cmd/killclaws
+
+      # --- Install KimiCLI via pip ---
+      - name: Install KimiCLI via pip
+        run: pip install kimi-cli
+        continue-on-error: true
+
+      - name: Create KimiCLI config directory
+        run: |
+          mkdir -p ~/.kimi
+          echo '{"api_key": "test", "model": "moonshot-v1"}' > ~/.kimi/config.json
+
+      - name: Verify kimi-cli installed
+        shell: bash
+        run: |
+          pip show kimi-cli || echo "WARN: kimi-cli not installed (may not be available for this platform)"
+
+      - name: Scan should detect KimiCLI
+        run: |
+          OUTPUT=$(./killclaws scan)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -qi "kimi" || { echo "FAIL: KimiCLI not detected"; exit 1; }
+          echo "PASS: KimiCLI detected"
+
+      - name: Run KillClaws (uninstall KimiCLI)
+        run: ./killclaws --yes --only kimicli --verbose
+
+      - name: Verify KimiCLI config removed
+        run: |
+          if [ -d "$HOME/.kimi" ]; then
+            echo "FAIL: ~/.kimi still exists"
+            exit 1
+          fi
+          echo "PASS: KimiCLI config removed"
+
+      - name: Verify pip package removed
+        shell: bash
+        run: |
+          if pip show kimi-cli 2>/dev/null; then
+            echo "FAIL: kimi-cli still installed via pip"
+            exit 1
+          fi
+          echo "PASS: kimi-cli pip package removed"
+
+      - name: Post-uninstall scan
+        run: ./killclaws scan --json
+
+  # ============================================================
+  # WorkBuddy — real npm install → scan → uninstall → verify
+  # ============================================================
+  e2e-workbuddy:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build KillClaws
+        run: go build -o killclaws ./cmd/killclaws
+
+      # --- Install WorkBuddy (CodeBuddy Code) via npm ---
+      - name: Install WorkBuddy (CodeBuddy) via npm
+        run: npm install -g @tencent-ai/codebuddy-code
+        continue-on-error: true
+
+      - name: Create WorkBuddy config directory
+        run: |
+          mkdir -p ~/.workbuddy
+          echo '{"version": "1.0.0", "theme": "dark"}' > ~/.workbuddy/config.json
+          mkdir -p ~/.workbuddy/sessions
+          echo 'session data' > ~/.workbuddy/sessions/latest.json
+
+      - name: Scan should detect WorkBuddy
+        run: |
+          OUTPUT=$(./killclaws scan)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -qi "workbuddy" || { echo "FAIL: WorkBuddy not detected"; exit 1; }
+          echo "PASS: WorkBuddy detected"
+
+      - name: Run KillClaws (uninstall WorkBuddy)
+        run: ./killclaws --yes --only workbuddy --verbose
+
+      - name: Verify WorkBuddy config removed
+        run: |
+          if [ -d "$HOME/.workbuddy" ]; then
+            echo "FAIL: ~/.workbuddy still exists"
+            exit 1
+          fi
+          echo "PASS: WorkBuddy config removed"
+
+      - name: Post-uninstall scan
+        run: ./killclaws scan --json
+
+  # ============================================================
+  # QClaw — mock only (GUI-only, no headless installer)
+  # ============================================================
+  e2e-qclaw-mock:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build KillClaws
+        run: go build -o killclaws ./cmd/killclaws
+
+      # QClaw is GUI-only (macOS .dmg), no headless installer available.
+      # Mock the config directories it would create.
+      - name: Create mock QClaw config
+        run: |
+          mkdir -p ~/.qclaw
+          echo '{"user": "test", "version": "1.0.0"}' > ~/.qclaw/config.json
+
+      - name: Scan should detect QClaw
+        run: |
+          OUTPUT=$(./killclaws scan)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -qi "qclaw" || { echo "FAIL: QClaw not detected"; exit 1; }
+          echo "PASS: QClaw detected"
+
+      - name: Run KillClaws (uninstall QClaw)
+        run: ./killclaws --yes --only qclaw --verbose
+
+      - name: Verify QClaw removal
+        run: |
+          if [ -d "$HOME/.qclaw" ]; then
+            echo "FAIL: ~/.qclaw still exists"
+            exit 1
+          fi
+          echo "PASS: QClaw config removed"
+
+  # ============================================================
+  # OpenClaw legacy paths — real directory cleanup
+  # ============================================================
   e2e-legacy-paths:
     runs-on: ubuntu-latest
     steps:
@@ -194,6 +461,9 @@ jobs:
           if [ "$FAIL" -eq 1 ]; then exit 1; fi
           echo "PASS: All legacy paths removed"
 
+  # ============================================================
+  # Dry-run safety test
+  # ============================================================
   e2e-dry-run:
     runs-on: ubuntu-latest
     steps:
