@@ -167,6 +167,7 @@ jobs:
             exit 1
           }
           Write-Host "PASS: openclaw npm package removed"
+          exit 0
 
       - name: Post-uninstall scan
         shell: pwsh
@@ -444,6 +445,7 @@ jobs:
             exit 1
           }
           Write-Host "PASS: kimi-cli pip package removed"
+          exit 0
 
   # ============================================================
   # WorkBuddy — real npm install → scan → uninstall → verify
@@ -564,7 +566,9 @@ jobs:
             exit 1
           }
           Write-Host "PASS: WorkBuddy npm package removed"
+          exit 0
 
+  # ============================================================
   # QClaw — mock config only (GUI-only, no headless installer)
   # ============================================================
   e2e-qclaw:

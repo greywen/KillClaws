@@ -320,6 +320,20 @@ detect_workbuddy() {
     add_kb SIZEKB_WORKBUDDY "$(path_size_kb "$p")"
   fi
 
+  # npm global package
+  if command_exists npm && npm list -g "@tencent-ai/codebuddy-code" 2>/dev/null | grep -q codebuddy; then
+    FOUND_WORKBUDDY=1
+    append_detail DETAILS_WORKBUDDY "      📦 npm: @tencent-ai/codebuddy-code"
+  fi
+  if command_exists pnpm && pnpm list -g "@tencent-ai/codebuddy-code" 2>/dev/null | grep -q codebuddy; then
+    FOUND_WORKBUDDY=1
+    append_detail DETAILS_WORKBUDDY "      📦 pnpm: @tencent-ai/codebuddy-code"
+  fi
+  if command_exists bun && bun pm ls -g 2>/dev/null | awk '/codebuddy/ { found=1 } END { exit(!found) }'; then
+    FOUND_WORKBUDDY=1
+    append_detail DETAILS_WORKBUDDY "      📦 bun: @tencent-ai/codebuddy-code"
+  fi
+
   pids="$(collect_pids "WorkBuddy workbuddy")"
   if [ -n "$pids" ]; then
     FOUND_WORKBUDDY=1
@@ -487,6 +501,18 @@ remove_workbuddy() {
   for pid in $PIDS_WORKBUDDY; do
     kill_pid_gracefully "$pid" "workbuddy"
   done
+
+  # npm packages
+  if command_exists npm; then
+    run_or_preview "Uninstalled npm package: @tencent-ai/codebuddy-code" "npm rm -g @tencent-ai/codebuddy-code" || true
+  fi
+  if command_exists pnpm; then
+    run_or_preview "Uninstalled pnpm package: @tencent-ai/codebuddy-code" "pnpm rm -g @tencent-ai/codebuddy-code" || true
+  fi
+  if command_exists bun; then
+    run_or_preview "Uninstalled bun package: @tencent-ai/codebuddy-code" "bun remove -g @tencent-ai/codebuddy-code" || true
+  fi
+
   remove_path "$HOME/.workbuddy" "~/.workbuddy"
   if [ "$IS_DARWIN" -eq 1 ]; then
     remove_path "$HOME/Library/Application Support/WorkBuddy" "~/Library/Application Support/WorkBuddy"
