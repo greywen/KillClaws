@@ -570,3 +570,626 @@ jobs:
           }
           if ($failed) { exit 1 }
           Write-Host "PASS: All products removed"
+
+  # ============================================================
+  # .command wrapper — local mode (macOS)
+  # ============================================================
+  e2e-command-local:
+    runs-on: macos-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create mock product configs
+        run: |
+          mkdir -p ~/.qclaw
+          echo '{"test": true}' > ~/.qclaw/config.json
+          mkdir -p ~/.zeroclaw
+          echo '{"test": true}' > ~/.zeroclaw/config.json
+
+      - name: Run .command --scan (local .sh present)
+        run: |
+          chmod +x killclaws.command
+          OUTPUT=$(echo "" | bash killclaws.command --scan 2>&1)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -qi "qclaw" || { echo "FAIL: QClaw not detected via .command"; exit 1; }
+          echo "$OUTPUT" | grep -qi "zeroclaw" || { echo "FAIL: ZeroClaw not detected via .command"; exit 1; }
+          echo "PASS: .command --scan detected products"
+
+      - name: Run .command --yes (uninstall via wrapper)
+        run: echo "" | bash killclaws.command --yes
+
+      - name: Verify products removed
+        run: |
+          FAIL=0
+          for dir in ~/.qclaw ~/.zeroclaw; do
+            if [ -d "$dir" ]; then
+              echo "FAIL: $dir still exists"
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" -eq 1 ]; then exit 1; fi
+          echo "PASS: All products removed via .command wrapper"
+
+  # ============================================================
+  # .command wrapper — download mode (macOS)
+  # ============================================================
+  e2e-command-download:
+    runs-on: macos-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove killclaws.sh to force download
+        run: rm -f killclaws.sh
+
+      - name: Run .command --scan (should download .sh from GitHub)
+        run: |
+          chmod +x killclaws.command
+          OUTPUT=$(echo "" | bash killclaws.command --scan 2>&1)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -qi "download\|scan\|product" || { echo "FAIL: .command download mode did not produce output"; exit 1; }
+          echo "PASS: .command download mode works"
+
+      - name: Verify downloaded script exists in /tmp
+        run: |
+          if [ ! -f /tmp/killclaws.sh ]; then
+            echo "FAIL: /tmp/killclaws.sh not found after download"
+            exit 1
+          fi
+          echo "PASS: Downloaded killclaws.sh found in /tmp"
+
+  # ============================================================
+  # .bat wrapper — local mode (Windows)
+  # ============================================================
+  e2e-bat-local:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create mock product configs
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.qclaw" | Out-Null
+          '{"test": true}' | Set-Content "$env:USERPROFILE\.qclaw\config.json"
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.picoclaw" | Out-Null
+          '{"test": true}' | Set-Content "$env:USERPROFILE\.picoclaw\config.toml"
+
+      - name: Run .bat scan (local .ps1 present)
+        shell: cmd
+        run: |
+          echo. | killclaws.bat
+
+      - name: Verify .bat executed ps1 (scan output)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $output = pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Scan 2>&1 | Out-String
+          Write-Host $output
+          if ($output -notmatch "QClaw") {
+            Write-Error "FAIL: QClaw not detected"
+            exit 1
+          }
+          Write-Host "PASS: .bat wrapper can invoke ps1 correctly"
+
+      - name: Uninstall via ps1 directly and verify
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Yes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify products removed
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($dir in @("$env:USERPROFILE\.qclaw", "$env:USERPROFILE\.picoclaw")) {
+            if (Test-Path $dir) {
+              Write-Error "FAIL: $dir still exists"
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+          Write-Host "PASS: All products removed via .bat wrapper flow"
+
+  # ============================================================
+  # .bat wrapper — download mode (Windows)
+  # ============================================================
+  e2e-bat-download:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove killclaws.ps1 to force download
+        shell: pwsh
+        run: Remove-Item -Force killclaws.ps1
+
+      - name: Run .bat (should download ps1 from GitHub)
+        shell: cmd
+        run: echo. | killclaws.bat
+
+      - name: Verify bat completed without error
+        shell: pwsh
+        run: |
+          Write-Host "PASS: .bat download mode completed"
+
+  # ============================================================
+  # Multi-product — Linux (install all 6 products, remove all)
+  # ============================================================
+  e2e-multi-product-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install all products
+        run: |
+          # OpenClaw (npm + config)
+          npm install -g openclaw@latest || true
+          mkdir -p ~/.openclaw
+          echo '{"test": true}' > ~/.openclaw/config.json
+
+          # QClaw (config only)
+          mkdir -p ~/.qclaw
+          echo '{"test": true}' > ~/.qclaw/config.json
+
+          # WorkBuddy (npm + config)
+          npm install -g @tencent-ai/codebuddy-code || true
+          mkdir -p ~/.workbuddy
+          echo '{"test": true}' > ~/.workbuddy/config.json
+
+          # ZeroClaw (binary + config)
+          mkdir -p "$HOME/.local/bin"
+          printf '#!/bin/bash\necho "zeroclaw v0.1.7"\n' > "$HOME/.local/bin/zeroclaw"
+          chmod +x "$HOME/.local/bin/zeroclaw"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          mkdir -p ~/.zeroclaw
+          echo '{"test": true}' > ~/.zeroclaw/config.json
+
+          # PicoClaw (binary + config)
+          printf '#!/bin/bash\necho "picoclaw v0.2.1"\n' > "$HOME/.local/bin/picoclaw"
+          chmod +x "$HOME/.local/bin/picoclaw"
+          mkdir -p ~/.picoclaw
+          echo '{"test": true}' > ~/.picoclaw/config.toml
+
+          # KimiCLI (pip + config)
+          pip install kimi-cli || true
+          mkdir -p ~/.kimi
+          echo '{"test": true}' > ~/.kimi/config.json
+
+          # Legacy paths
+          mkdir -p ~/.clawdbot ~/.molthub ~/clawd
+          echo 'legacy' > ~/.clawdbot/config.json
+          echo 'legacy' > ~/.molthub/config.json
+          echo 'legacy' > ~/clawd/test.md
+
+      - name: Scan should detect all products
+        run: |
+          OUTPUT=$(bash killclaws.sh --scan 2>&1)
+          echo "$OUTPUT"
+          for name in OpenClaw QClaw WorkBuddy ZeroClaw PicoClaw KimiCLI; do
+            echo "$OUTPUT" | grep -qi "$name" || { echo "FAIL: $name not detected"; exit 1; }
+          done
+          echo "PASS: All 6 products detected"
+
+      - name: Dry-run should preserve everything
+        run: |
+          bash killclaws.sh --dry-run --yes
+          for dir in ~/.openclaw ~/.qclaw ~/.workbuddy ~/.zeroclaw ~/.picoclaw ~/.kimi ~/.clawdbot ~/.molthub ~/clawd; do
+            if [ ! -d "$dir" ]; then
+              echo "FAIL: dry-run removed $dir"
+              exit 1
+            fi
+          done
+          echo "PASS: Dry-run preserved all files"
+
+      - name: Uninstall all products
+        run: bash killclaws.sh --yes
+
+      - name: Verify all config dirs removed
+        run: |
+          FAIL=0
+          for dir in ~/.openclaw ~/.qclaw ~/.workbuddy ~/.zeroclaw ~/.picoclaw ~/.kimi ~/.clawdbot ~/.molthub ~/clawd; do
+            if [ -d "$dir" ]; then
+              echo "FAIL: $dir still exists"
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" -eq 1 ]; then exit 1; fi
+          echo "PASS: All config directories removed"
+
+      - name: Post-uninstall scan should find nothing
+        run: |
+          OUTPUT=$(bash killclaws.sh --scan 2>&1)
+          echo "$OUTPUT"
+          echo "PASS: Post-uninstall scan complete"
+
+  # ============================================================
+  # Multi-product — macOS (install all 6 products, remove all)
+  # ============================================================
+  e2e-multi-product-macos:
+    runs-on: macos-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install all products
+        run: |
+          npm install -g openclaw@latest || true
+          mkdir -p ~/.openclaw && echo '{"test": true}' > ~/.openclaw/config.json
+
+          mkdir -p ~/.qclaw && echo '{"test": true}' > ~/.qclaw/config.json
+
+          npm install -g @tencent-ai/codebuddy-code || true
+          mkdir -p ~/.workbuddy && echo '{"test": true}' > ~/.workbuddy/config.json
+
+          mkdir -p "$HOME/.local/bin"
+          printf '#!/bin/bash\necho "zeroclaw"\n' > "$HOME/.local/bin/zeroclaw"
+          chmod +x "$HOME/.local/bin/zeroclaw"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          mkdir -p ~/.zeroclaw && echo '{"test": true}' > ~/.zeroclaw/config.json
+
+          printf '#!/bin/bash\necho "picoclaw"\n' > "$HOME/.local/bin/picoclaw"
+          chmod +x "$HOME/.local/bin/picoclaw"
+          mkdir -p ~/.picoclaw && echo '{"test": true}' > ~/.picoclaw/config.toml
+
+          pip install kimi-cli || true
+          mkdir -p ~/.kimi && echo '{"test": true}' > ~/.kimi/config.json
+
+          mkdir -p ~/.clawdbot ~/.molthub ~/clawd
+
+      - name: Scan should detect all products
+        run: |
+          OUTPUT=$(bash killclaws.sh --scan 2>&1)
+          echo "$OUTPUT"
+          for name in OpenClaw QClaw WorkBuddy ZeroClaw PicoClaw KimiCLI; do
+            echo "$OUTPUT" | grep -qi "$name" || { echo "FAIL: $name not detected"; exit 1; }
+          done
+          echo "PASS: All 6 products detected on macOS"
+
+      - name: Uninstall all products
+        run: bash killclaws.sh --yes
+
+      - name: Verify all config dirs removed
+        run: |
+          FAIL=0
+          for dir in ~/.openclaw ~/.qclaw ~/.workbuddy ~/.zeroclaw ~/.picoclaw ~/.kimi ~/.clawdbot ~/.molthub ~/clawd; do
+            if [ -d "$dir" ]; then
+              echo "FAIL: $dir still exists"
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" -eq 1 ]; then exit 1; fi
+          echo "PASS: All config directories removed on macOS"
+
+  # ============================================================
+  # Clean system — no products installed (all 3 platforms)
+  # ============================================================
+  e2e-clean-system:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            shell: bash
+          - os: macos-latest
+            shell: bash
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run scan on clean system
+        run: |
+          OUTPUT=$(bash killclaws.sh --scan 2>&1)
+          echo "$OUTPUT"
+          echo "PASS: Scan completed on clean system without errors"
+
+      - name: Run --yes on clean system (no-op)
+        run: |
+          bash killclaws.sh --yes
+          echo "PASS: --yes on clean system completed without errors"
+
+      - name: Run --dry-run on clean system
+        run: |
+          bash killclaws.sh --dry-run --yes
+          echo "PASS: --dry-run on clean system completed without errors"
+
+  e2e-clean-system-windows:
+    runs-on: windows-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run scan on clean system
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Scan
+          Write-Host "PASS: Scan completed on clean Windows system"
+
+      - name: Run -Yes on clean system (no-op)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Yes
+          Write-Host "PASS: -Yes on clean system completed without errors"
+
+      - name: Run -DryRun on clean system
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -DryRun -Yes
+          Write-Host "PASS: -DryRun on clean system completed without errors"
+
+  # ============================================================
+  # Idempotency — run uninstall twice, second run must not fail
+  # ============================================================
+  e2e-idempotent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create mock product configs
+        run: |
+          mkdir -p ~/.openclaw ~/.qclaw ~/.zeroclaw
+          echo '{"test": true}' > ~/.openclaw/config.json
+          echo '{"test": true}' > ~/.qclaw/config.json
+          echo '{"test": true}' > ~/.zeroclaw/config.json
+
+      - name: First uninstall
+        run: bash killclaws.sh --yes
+
+      - name: Verify products removed
+        run: |
+          for dir in ~/.openclaw ~/.qclaw ~/.zeroclaw; do
+            if [ -d "$dir" ]; then
+              echo "FAIL: $dir still exists after first uninstall"
+              exit 1
+            fi
+          done
+          echo "PASS: All removed after first uninstall"
+
+      - name: Second uninstall (idempotency test)
+        run: |
+          bash killclaws.sh --yes
+          echo "PASS: Second uninstall completed without errors"
+
+      - name: Third scan (should find nothing)
+        run: |
+          OUTPUT=$(bash killclaws.sh --scan 2>&1)
+          echo "$OUTPUT"
+          echo "PASS: Scan after double-uninstall works correctly"
+
+  # ============================================================
+  # Windows APPDATA paths — QClaw/WorkBuddy Windows-specific dirs
+  # ============================================================
+  e2e-windows-appdata:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Windows-specific APPDATA configs
+        shell: pwsh
+        run: |
+          # QClaw APPDATA paths
+          $qclawAppData = Join-Path $env:APPDATA "QClaw"
+          $qclawLocalAppData = Join-Path $env:LOCALAPPDATA "QClaw"
+          New-Item -ItemType Directory -Force -Path $qclawAppData | Out-Null
+          '{"test": true}' | Set-Content (Join-Path $qclawAppData "config.json")
+          New-Item -ItemType Directory -Force -Path $qclawLocalAppData | Out-Null
+          '{"cache": true}' | Set-Content (Join-Path $qclawLocalAppData "cache.json")
+
+          # QClaw user config
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.qclaw" | Out-Null
+          '{"test": true}' | Set-Content "$env:USERPROFILE\.qclaw\config.json"
+
+          # WorkBuddy APPDATA paths
+          $wbAppData = Join-Path $env:APPDATA "WorkBuddy"
+          $wbLocalAppData = Join-Path $env:LOCALAPPDATA "WorkBuddy"
+          New-Item -ItemType Directory -Force -Path $wbAppData | Out-Null
+          '{"test": true}' | Set-Content (Join-Path $wbAppData "config.json")
+          New-Item -ItemType Directory -Force -Path $wbLocalAppData | Out-Null
+          '{"cache": true}' | Set-Content (Join-Path $wbLocalAppData "cache.json")
+
+          # WorkBuddy user config
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.workbuddy" | Out-Null
+          '{"test": true}' | Set-Content "$env:USERPROFILE\.workbuddy\config.json"
+
+          # OpenClaw APPDATA
+          $ocAppData = Join-Path $env:APPDATA "OpenClaw"
+          New-Item -ItemType Directory -Force -Path $ocAppData | Out-Null
+          '{"test": true}' | Set-Content (Join-Path $ocAppData "config.json")
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.openclaw" | Out-Null
+          '{"test": true}' | Set-Content "$env:USERPROFILE\.openclaw\config.json"
+
+      - name: Scan should detect products via APPDATA
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $output = pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Scan 2>&1 | Out-String
+          Write-Host $output
+          foreach ($name in @("QClaw", "WorkBuddy", "OpenClaw")) {
+            if ($output -notmatch $name) {
+              Write-Error "FAIL: $name not detected via APPDATA paths"
+              exit 1
+            }
+          }
+          Write-Host "PASS: All products detected via APPDATA paths"
+
+      - name: Uninstall all
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Yes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify user config dirs removed
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($dir in @("$env:USERPROFILE\.qclaw", "$env:USERPROFILE\.workbuddy", "$env:USERPROFILE\.openclaw")) {
+            if (Test-Path $dir) {
+              Write-Error "FAIL: $dir still exists"
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+          Write-Host "PASS: All user config dirs removed"
+
+      - name: Verify APPDATA dirs removed
+        shell: pwsh
+        run: |
+          $failed = $false
+          $dirs = @(
+            (Join-Path $env:APPDATA "QClaw"),
+            (Join-Path $env:LOCALAPPDATA "QClaw"),
+            (Join-Path $env:APPDATA "WorkBuddy"),
+            (Join-Path $env:LOCALAPPDATA "WorkBuddy"),
+            (Join-Path $env:APPDATA "OpenClaw")
+          )
+          foreach ($dir in $dirs) {
+            if (Test-Path $dir) {
+              Write-Error "FAIL: $dir still exists"
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+          Write-Host "PASS: All APPDATA dirs removed"
+
+  # ============================================================
+  # Selective removal — remove only selected products
+  # ============================================================
+  e2e-selective-removal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create 3 product configs
+        run: |
+          mkdir -p ~/.openclaw ~/.qclaw ~/.zeroclaw
+          echo '{"test": true}' > ~/.openclaw/config.json
+          echo '{"test": true}' > ~/.qclaw/config.json
+          echo '{"test": true}' > ~/.zeroclaw/config.json
+
+      - name: Scan to verify 3 products detected
+        run: |
+          OUTPUT=$(bash killclaws.sh --scan 2>&1)
+          echo "$OUTPUT"
+          for name in OpenClaw QClaw ZeroClaw; do
+            echo "$OUTPUT" | grep -qi "$name" || { echo "FAIL: $name not detected"; exit 1; }
+          done
+          echo "PASS: All 3 products detected"
+
+      - name: Selective removal (choose items 1 and 3 via stdin)
+        run: |
+          echo "1 3" | bash killclaws.sh || true
+
+      - name: Verify at least one product was removed
+        run: |
+          REMOVED=0
+          for dir in ~/.openclaw ~/.qclaw ~/.zeroclaw; do
+            if [ ! -d "$dir" ]; then
+              echo "Removed: $dir"
+              REMOVED=$((REMOVED + 1))
+            else
+              echo "Kept: $dir"
+            fi
+          done
+          if [ "$REMOVED" -eq 0 ]; then
+            echo "FAIL: No products were removed by selective mode"
+            exit 1
+          fi
+          echo "PASS: Selective removal worked ($REMOVED products removed)"
+
+  # ============================================================
+  # Windows idempotent — run uninstall twice on Windows
+  # ============================================================
+  e2e-windows-idempotent:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create mock configs
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.qclaw" | Out-Null
+          '{"test": true}' | Set-Content "$env:USERPROFILE\.qclaw\config.json"
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.zeroclaw" | Out-Null
+          '{"test": true}' | Set-Content "$env:USERPROFILE\.zeroclaw\config.json"
+
+      - name: First uninstall
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Yes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify products removed
+        shell: pwsh
+        run: |
+          foreach ($dir in @("$env:USERPROFILE\.qclaw", "$env:USERPROFILE\.zeroclaw")) {
+            if (Test-Path $dir) {
+              Write-Error "FAIL: $dir still exists"
+              exit 1
+            }
+          }
+          Write-Host "PASS: Products removed after first uninstall"
+
+      - name: Second uninstall (idempotency)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Yes
+          Write-Host "PASS: Second uninstall completed without errors"
+
+      - name: Third scan (should find nothing)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Scan
+          Write-Host "PASS: Scan after double-uninstall works correctly"

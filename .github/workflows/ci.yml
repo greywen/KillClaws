@@ -70,3 +70,70 @@ jobs:
 
       - name: Smoke test --help
         run: bash killclaws.sh --help
+
+  # ============================================================
+  # killclaws.command wrapper — lint + smoke (macOS)
+  # ============================================================
+  lint-command:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check (bash -n)
+        run: bash -n killclaws.command
+
+      - name: Install shellcheck
+        run: brew install shellcheck
+
+      - name: ShellCheck killclaws.command
+        run: shellcheck -x -s bash killclaws.command
+
+      - name: Verify shebang line
+        run: |
+          HEAD=$(head -1 killclaws.command)
+          if [ "$HEAD" != "#!/bin/bash" ]; then
+            echo "FAIL: Expected #!/bin/bash, got: $HEAD"
+            exit 1
+          fi
+          echo "PASS: Shebang line correct"
+
+      - name: Smoke test --help (with .sh present)
+        run: |
+          chmod +x killclaws.command
+          echo "" | bash killclaws.command --help
+
+      - name: Smoke test --scan (with .sh present)
+        run: echo "" | bash killclaws.command --scan
+
+  # ============================================================
+  # killclaws.bat wrapper — lint + smoke (Windows)
+  # ============================================================
+  lint-bat:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify bat file structure
+        shell: pwsh
+        run: |
+          $content = Get-Content killclaws.bat -Raw
+          $checks = @(
+            @{ Pattern = '@echo off'; Desc = '@echo off present' },
+            @{ Pattern = 'powershell -ExecutionPolicy Bypass'; Desc = 'ExecutionPolicy Bypass present' },
+            @{ Pattern = 'killclaws.ps1'; Desc = 'References killclaws.ps1' },
+            @{ Pattern = 'pause'; Desc = 'Has pause at end' }
+          )
+          $failed = $false
+          foreach ($c in $checks) {
+            if ($content -match [regex]::Escape($c.Pattern)) {
+              Write-Host "PASS: $($c.Desc)"
+            } else {
+              Write-Error "FAIL: $($c.Desc)"
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+
+      - name: Smoke test bat with ps1 present
+        shell: cmd
+        run: echo. | killclaws.bat
