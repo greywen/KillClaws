@@ -74,14 +74,14 @@ function Remove-PathSafe($path) {
 function Detect-OpenClaw {
     $found = $false
     $details = @()
-    $home = $env:USERPROFILE
+    $userHome = $env:USERPROFILE
 
     # Config directories
     $dirs = @(
-        @{ Path="$home\.openclaw"; Label="~\.openclaw" },
-        @{ Path="$home\clawd"; Label="~\clawd (legacy workspace)" },
-        @{ Path="$home\.clawdbot"; Label="~\.clawdbot (legacy)" },
-        @{ Path="$home\.molthub"; Label="~\.molthub (legacy)" }
+        @{ Path="$userHome\.openclaw"; Label="~\.openclaw" },
+        @{ Path="$userHome\clawd"; Label="~\clawd (legacy workspace)" },
+        @{ Path="$userHome\.clawdbot"; Label="~\.clawdbot (legacy)" },
+        @{ Path="$userHome\.molthub"; Label="~\.molthub (legacy)" }
     )
     foreach ($d in $dirs) {
         if (Test-Path $d.Path) {
@@ -147,10 +147,10 @@ function Detect-OpenClaw {
 function Detect-QClaw {
     $found = $false
     $details = @()
-    $home = $env:USERPROFILE
+    $userHome = $env:USERPROFILE
 
-    if (Test-Path "$home\.qclaw") {
-        $sz = Get-DirSizeHuman "$home\.qclaw"
+    if (Test-Path "$userHome\.qclaw") {
+        $sz = Get-DirSizeHuman "$userHome\.qclaw"
         $details += "      dir  ~\.qclaw ($sz)"
         $found = $true
     }
@@ -176,10 +176,10 @@ function Detect-QClaw {
 function Detect-WorkBuddy {
     $found = $false
     $details = @()
-    $home = $env:USERPROFILE
+    $userHome = $env:USERPROFILE
 
-    if (Test-Path "$home\.workbuddy") {
-        $sz = Get-DirSizeHuman "$home\.workbuddy"
+    if (Test-Path "$userHome\.workbuddy") {
+        $sz = Get-DirSizeHuman "$userHome\.workbuddy"
         $details += "      dir  ~\.workbuddy ($sz)"
         $found = $true
     }
@@ -221,10 +221,10 @@ function Detect-WorkBuddy {
 function Detect-ZeroClaw {
     $found = $false
     $details = @()
-    $home = $env:USERPROFILE
+    $userHome = $env:USERPROFILE
 
-    if (Test-Path "$home\.zeroclaw") {
-        $sz = Get-DirSizeHuman "$home\.zeroclaw"
+    if (Test-Path "$userHome\.zeroclaw") {
+        $sz = Get-DirSizeHuman "$userHome\.zeroclaw"
         $details += "      dir  ~\.zeroclaw ($sz)"
         $found = $true
     }
@@ -247,10 +247,10 @@ function Detect-ZeroClaw {
 function Detect-PicoClaw {
     $found = $false
     $details = @()
-    $home = $env:USERPROFILE
+    $userHome = $env:USERPROFILE
 
-    if (Test-Path "$home\.picoclaw") {
-        $sz = Get-DirSizeHuman "$home\.picoclaw"
+    if (Test-Path "$userHome\.picoclaw") {
+        $sz = Get-DirSizeHuman "$userHome\.picoclaw"
         $details += "      dir  ~\.picoclaw ($sz)"
         $found = $true
     }
@@ -273,10 +273,10 @@ function Detect-PicoClaw {
 function Detect-KimiCLI {
     $found = $false
     $details = @()
-    $home = $env:USERPROFILE
+    $userHome = $env:USERPROFILE
 
-    if (Test-Path "$home\.kimi") {
-        $sz = Get-DirSizeHuman "$home\.kimi"
+    if (Test-Path "$userHome\.kimi") {
+        $sz = Get-DirSizeHuman "$userHome\.kimi"
         $details += "      dir  ~\.kimi ($sz)"
         $found = $true
     }
@@ -348,8 +348,8 @@ function Remove-OpenClaw {
     }
 
     # Directories
-    $home = $env:USERPROFILE
-    foreach ($d in @("$home\.openclaw", "$home\clawd", "$home\.clawdbot", "$home\.molthub")) {
+    $userHome = $env:USERPROFILE
+    foreach ($d in @("$userHome\.openclaw", "$userHome\clawd", "$userHome\.clawdbot", "$userHome\.molthub")) {
         Remove-PathSafe $d
     }
     foreach ($d in @("$env:APPDATA\OpenClaw", "$env:LOCALAPPDATA\OpenClaw", "$env:LOCALAPPDATA\Programs\OpenClaw")) {
@@ -360,8 +360,8 @@ function Remove-OpenClaw {
 function Remove-QClaw {
     Write-Host "`n  Removing QClaw..." -ForegroundColor White
     Stop-ProcessByName "qclaw" | Out-Null
-    $home = $env:USERPROFILE
-    Remove-PathSafe "$home\.qclaw"
+    $userHome = $env:USERPROFILE
+    Remove-PathSafe "$userHome\.qclaw"
     foreach ($d in @("$env:APPDATA\QClaw", "$env:LOCALAPPDATA\QClaw", "$env:LOCALAPPDATA\Programs\QClaw")) {
         Remove-PathSafe $d
     }
@@ -389,8 +389,8 @@ function Remove-WorkBuddy {
         }
     }
 
-    $home = $env:USERPROFILE
-    Remove-PathSafe "$home\.workbuddy"
+    $userHome = $env:USERPROFILE
+    Remove-PathSafe "$userHome\.workbuddy"
     foreach ($d in @("$env:APPDATA\WorkBuddy", "$env:LOCALAPPDATA\WorkBuddy", "$env:LOCALAPPDATA\Programs\WorkBuddy")) {
         Remove-PathSafe $d
     }
