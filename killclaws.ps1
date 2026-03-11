@@ -1,4 +1,4 @@
-# KillClaws — One command to remove all Claw AI products (Windows)
+﻿# KillClaws — One command to remove all Claw AI products (Windows)
 # Usage: powershell -ExecutionPolicy Bypass -File killclaws.ps1 [-Scan] [-Yes] [-DryRun]
 param(
     [switch]$Scan,
