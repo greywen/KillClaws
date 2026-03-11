@@ -40,6 +40,12 @@ chmod +x killclaws.sh
 ./killclaws.sh
 ```
 
+### macOS (双击运行)
+
+从 [Releases](https://github.com/greywen/KillClaws/releases) 下载 `killclaws.command`，双击即可在终端中运行。
+
+> `.command` 会自动查找同目录下的 `killclaws.sh`，如果不存在则自动从 GitHub 下载最新版本。
+
 ### Windows (双击运行)
 
 从 [Releases](https://github.com/greywen/KillClaws/releases) 下载 `killclaws.bat`，双击即可运行。
