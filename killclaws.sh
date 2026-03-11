@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2088
 set -euo pipefail
 
 # killclaws.sh - detect and remove Claw AI assistant products
@@ -603,7 +604,7 @@ selection_contains() {
 }
 
 ask_selection() {
-  local input i n cleaned part
+  local input n cleaned part
 
   if [ "$FOUND_COUNT" -eq 0 ]; then
     SELECTED_KEYS=""

@@ -35,13 +35,15 @@ jobs:
       - name: Syntax check (parse only)
         shell: pwsh
         run: |
+          $tokens = $null
+          $parseErrors = $null
           $null = [System.Management.Automation.Language.Parser]::ParseFile(
-            "$PWD\killclaws.ps1",
-            [ref]$null,
-            [ref]$errors
+            (Join-Path $PWD "killclaws.ps1"),
+            [ref]$tokens,
+            [ref]$parseErrors
           )
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Error $_.Message }
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | ForEach-Object { Write-Error $_.Message }
             exit 1
           }
           Write-Host "Syntax OK"

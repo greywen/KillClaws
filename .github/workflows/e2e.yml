@@ -109,7 +109,7 @@ jobs:
       - name: Post-install scan (should detect OpenClaw)
         shell: pwsh
         run: |
-          $output = .\killclaws.ps1 -Scan 2>&1 | Out-String
+          $output = .\killclaws.ps1 -Scan *>&1 | Out-String
           Write-Host $output
           if ($output -notmatch "OpenClaw") {
             Write-Error "FAIL: OpenClaw not detected"
@@ -503,7 +503,7 @@ jobs:
       - name: Scan should detect products
         shell: pwsh
         run: |
-          $output = .\killclaws.ps1 -Scan 2>&1 | Out-String
+          $output = .\killclaws.ps1 -Scan *>&1 | Out-String
           Write-Host $output
           foreach ($name in @("QClaw", "ZeroClaw", "PicoClaw", "KimiCLI")) {
             if ($output -notmatch $name) {
