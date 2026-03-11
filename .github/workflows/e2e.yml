@@ -156,6 +156,18 @@ jobs:
           }
           Write-Host "PASS: .openclaw removed"
 
+      - name: Verify npm package removed
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $out = npm list -g openclaw 2>&1 | Out-String
+          if ($out -match "openclaw") {
+            Write-Error "FAIL: openclaw still in npm global"
+            exit 1
+          }
+          Write-Host "PASS: openclaw npm package removed"
+
       - name: Post-uninstall scan
         shell: pwsh
         run: |
@@ -230,6 +242,14 @@ jobs:
           fi
           echo "PASS: ZeroClaw config removed"
 
+      - name: Verify ZeroClaw binary removed
+        run: |
+          if command -v zeroclaw >/dev/null 2>&1; then
+            echo "FAIL: zeroclaw binary still exists at $(command -v zeroclaw)"
+            exit 1
+          fi
+          echo "PASS: ZeroClaw binary removed"
+
   # ============================================================
   # PicoClaw — binary install → scan → uninstall → verify
   # ============================================================
@@ -297,6 +317,14 @@ jobs:
           fi
           echo "PASS: PicoClaw config removed"
 
+      - name: Verify PicoClaw binary removed
+        run: |
+          if command -v picoclaw >/dev/null 2>&1; then
+            echo "FAIL: picoclaw binary still exists at $(command -v picoclaw)"
+            exit 1
+          fi
+          echo "PASS: PicoClaw binary removed"
+
   # ============================================================
   # KimiCLI — real pip install → scan → uninstall → verify
   # ============================================================
@@ -348,7 +376,74 @@ jobs:
             echo "FAIL: kimi-cli still installed via pip"
             exit 1
           fi
-          echo "PASS: kimi-cli pip package removed"
+          echo "PASS: KimiCLI pip package removed"
+
+  # ============================================================
+  # KimiCLI — Windows pip install → scan → uninstall → verify
+  # ============================================================
+  e2e-kimicli-windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install KimiCLI via pip
+        shell: pwsh
+        run: pip install kimi-cli
+        continue-on-error: true
+
+      - name: Create KimiCLI config
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.kimi" | Out-Null
+          '{"api_key": "test", "model": "moonshot-v1"}' | Set-Content "$env:USERPROFILE\.kimi\config.json"
+
+      - name: Scan should detect KimiCLI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $output = pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Scan 2>&1 | Out-String
+          Write-Host $output
+          if ($output -notmatch "KimiCLI") {
+            Write-Error "FAIL: KimiCLI not detected"
+            exit 1
+          }
+          Write-Host "PASS: KimiCLI detected"
+
+      - name: Run KillClaws (uninstall)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Yes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify KimiCLI config removed
+        shell: pwsh
+        run: |
+          if (Test-Path "$env:USERPROFILE\.kimi") {
+            Write-Error "FAIL: .kimi still exists"
+            exit 1
+          }
+          Write-Host "PASS: KimiCLI config removed"
+
+      - name: Verify pip package removed
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $out = pip show kimi-cli 2>&1 | Out-String
+          if ($LASTEXITCODE -eq 0 -and $out -match "kimi-cli") {
+            Write-Error "FAIL: kimi-cli still installed via pip"
+            exit 1
+          }
+          Write-Host "PASS: kimi-cli pip package removed"
 
   # ============================================================
   # WorkBuddy — real npm install → scan → uninstall → verify
@@ -395,7 +490,81 @@ jobs:
           fi
           echo "PASS: WorkBuddy config removed"
 
+      - name: Verify npm package removed
+        run: |
+          if npm list -g @tencent-ai/codebuddy-code 2>/dev/null | grep -q codebuddy; then
+            echo "FAIL: @tencent-ai/codebuddy-code still in npm global"
+            exit 1
+          fi
+          echo "PASS: WorkBuddy npm package removed"
+
   # ============================================================
+  # WorkBuddy — Windows npm install → scan → uninstall → verify
+  # ============================================================
+  e2e-workbuddy-windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install WorkBuddy (CodeBuddy) via npm
+        shell: pwsh
+        run: npm install -g @tencent-ai/codebuddy-code
+        continue-on-error: true
+
+      - name: Create WorkBuddy config
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.workbuddy" | Out-Null
+          '{"version": "1.0.0"}' | Set-Content "$env:USERPROFILE\.workbuddy\config.json"
+
+      - name: Scan should detect WorkBuddy
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $output = pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Scan 2>&1 | Out-String
+          Write-Host $output
+          if ($output -notmatch "WorkBuddy") {
+            Write-Error "FAIL: WorkBuddy not detected"
+            exit 1
+          }
+          Write-Host "PASS: WorkBuddy detected"
+
+      - name: Run KillClaws (uninstall)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Yes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify WorkBuddy config removed
+        shell: pwsh
+        run: |
+          if (Test-Path "$env:USERPROFILE\.workbuddy") {
+            Write-Error "FAIL: .workbuddy still exists"
+            exit 1
+          }
+          Write-Host "PASS: WorkBuddy config removed"
+
+      - name: Verify npm package removed
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $out = npm list -g @tencent-ai/codebuddy-code 2>&1 | Out-String
+          if ($out -match "codebuddy") {
+            Write-Error "FAIL: @tencent-ai/codebuddy-code still in npm global"
+            exit 1
+          }
+          Write-Host "PASS: WorkBuddy npm package removed"
+
   # QClaw — mock config only (GUI-only, no headless installer)
   # ============================================================
   e2e-qclaw:
@@ -815,6 +984,32 @@ jobs:
           if [ "$FAIL" -eq 1 ]; then exit 1; fi
           echo "PASS: All config directories removed"
 
+      - name: Verify packages removed
+        run: |
+          FAIL=0
+          # npm: openclaw
+          if npm list -g openclaw 2>/dev/null | grep -q openclaw; then
+            echo "FAIL: openclaw still in npm global"
+            FAIL=1
+          fi
+          # pip: kimi-cli
+          if pip show kimi-cli 2>/dev/null; then
+            echo "FAIL: kimi-cli still installed via pip"
+            FAIL=1
+          fi
+          # binary: zeroclaw
+          if command -v zeroclaw >/dev/null 2>&1; then
+            echo "FAIL: zeroclaw binary still exists"
+            FAIL=1
+          fi
+          # binary: picoclaw
+          if command -v picoclaw >/dev/null 2>&1; then
+            echo "FAIL: picoclaw binary still exists"
+            FAIL=1
+          fi
+          if [ "$FAIL" -eq 1 ]; then exit 1; fi
+          echo "PASS: All packages and binaries removed"
+
       - name: Post-uninstall scan should find nothing
         run: |
           OUTPUT=$(bash killclaws.sh --scan 2>&1)
@@ -887,6 +1082,32 @@ jobs:
           done
           if [ "$FAIL" -eq 1 ]; then exit 1; fi
           echo "PASS: All config directories removed on macOS"
+
+      - name: Verify packages removed
+        run: |
+          FAIL=0
+          # npm: openclaw
+          if npm list -g openclaw 2>/dev/null | grep -q openclaw; then
+            echo "FAIL: openclaw still in npm global"
+            FAIL=1
+          fi
+          # pip: kimi-cli
+          if pip show kimi-cli 2>/dev/null; then
+            echo "FAIL: kimi-cli still installed via pip"
+            FAIL=1
+          fi
+          # binary: zeroclaw
+          if command -v zeroclaw >/dev/null 2>&1; then
+            echo "FAIL: zeroclaw binary still exists"
+            FAIL=1
+          fi
+          # binary: picoclaw
+          if command -v picoclaw >/dev/null 2>&1; then
+            echo "FAIL: picoclaw binary still exists"
+            FAIL=1
+          fi
+          if [ "$FAIL" -eq 1 ]; then exit 1; fi
+          echo "PASS: All packages and binaries removed"
 
   # ============================================================
   # Clean system — no products installed (all 3 platforms)
