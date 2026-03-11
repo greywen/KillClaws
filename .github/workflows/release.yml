@@ -32,10 +32,11 @@ jobs:
           mkdir -p dist
           cp killclaws.sh dist/
           cp killclaws.ps1 dist/
+          cp killclaws.bat dist/
           cd dist
-          tar czf killclaws-${{ steps.version.outputs.VERSION }}.tar.gz killclaws.sh killclaws.ps1
-          zip killclaws-${{ steps.version.outputs.VERSION }}.zip killclaws.sh killclaws.ps1
-          sha256sum *.tar.gz *.zip killclaws.sh killclaws.ps1 > checksums.txt
+          tar czf killclaws-${{ steps.version.outputs.VERSION }}.tar.gz killclaws.sh killclaws.ps1 killclaws.bat
+          zip killclaws-${{ steps.version.outputs.VERSION }}.zip killclaws.sh killclaws.ps1 killclaws.bat
+          sha256sum *.tar.gz *.zip killclaws.sh killclaws.ps1 killclaws.bat > checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -51,6 +52,9 @@ jobs:
             ```bash
             curl -fsSL https://raw.githubusercontent.com/greywen/KillClaws/${{ steps.version.outputs.VERSION }}/killclaws.sh | bash
             ```
+
+            **Windows — 双击运行:**
+            下载 `killclaws.bat`，双击即可运行。
 
             **Windows (PowerShell):**
             ```powershell
@@ -69,12 +73,14 @@ jobs:
 
             | File | Description |
             |------|-------------|
+            | `killclaws.bat` | **Windows 双击运行** (推荐) |
             | `killclaws.sh` | Linux/macOS bash script |
             | `killclaws.ps1` | Windows PowerShell script |
-            | `killclaws-*.tar.gz` | Archive (both scripts) |
-            | `killclaws-*.zip` | Archive (both scripts) |
+            | `killclaws-*.tar.gz` | Archive (all scripts) |
+            | `killclaws-*.zip` | Archive (all scripts) |
             | `checksums.txt` | SHA256 checksums |
           files: |
+            dist/killclaws.bat
             dist/killclaws.sh
             dist/killclaws.ps1
             dist/killclaws-${{ steps.version.outputs.VERSION }}.tar.gz
