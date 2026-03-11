@@ -1,113 +1,86 @@
 # 🦞🔪 KillClaws
 
-**One command to remove all Claw products from your system.**
+**One command to remove all Claw AI products from your system.**
 
 [![CI](https://github.com/greywen/KillClaws/actions/workflows/ci.yml/badge.svg)](https://github.com/greywen/KillClaws/actions/workflows/ci.yml)
 [![E2E](https://github.com/greywen/KillClaws/actions/workflows/e2e.yml/badge.svg)](https://github.com/greywen/KillClaws/actions/workflows/e2e.yml)
 
-The Claw ecosystem (OpenClaw, QClaw, WorkBuddy, ArkClaw, KimiClaw, etc.) has exploded since January 2026. Many users installed multiple products to try them out, granting extensive permissions. KillClaws scans your system for all installed Claw products and removes them cleanly in one command.
+The Claw ecosystem (OpenClaw, QClaw, WorkBuddy, ZeroClaw, PicoClaw, KimiCLI, etc.) has exploded in popularity. Many users installed multiple products to try them out, granting extensive permissions along the way. **KillClaws** scans your system, shows what's installed, lets you pick which to remove, and cleans everything up — configs, packages, services, binaries — in one command.
 
 ## Supported Products
 
-| Product | Developer | Detection | Uninstall |
-|---------|-----------|-----------|-----------|
-| **OpenClaw** | Community OSS | ✅ Full | ✅ Full (npm + services + configs + macOS App + legacy paths) |
-| **QClaw** | Tencent | ✅ Full | ✅ Full (app + configs) |
-| **WorkBuddy** | Tencent | ✅ Full | ✅ Full (app + configs) |
-| **ZeroClaw** | Community | ✅ Full | ✅ Full (binary + configs) |
-| **PicoClaw** | Sipeed | ✅ Full | ✅ Full (binary + configs) |
-| **KimiCLI** | Moonshot AI | ✅ Full | ✅ Full (pip + configs) |
+| Product | Developer | What Gets Removed |
+|---------|-----------|-------------------|
+| **OpenClaw** | Community OSS | npm/pnpm/bun package, services (launchd/systemd/schtasks), configs, macOS .app, legacy paths (~/.clawdbot, ~/.molthub, ~/clawd) |
+| **QClaw** | Tencent | App, configs (~/.qclaw), Library/AppData dirs |
+| **WorkBuddy** | Tencent | npm package (@tencent-ai/codebuddy-code), app, configs, Library/AppData dirs |
+| **ZeroClaw** | Community | Binary, configs (~/.zeroclaw) |
+| **PicoClaw** | Sipeed | Binary, configs (~/.picoclaw) |
+| **KimiCLI** | Moonshot AI | pip package (kimi-cli), binary, configs (~/.kimi) |
 
 ## Supported Platforms
 
-- **macOS** (Apple Silicon + Intel)
 - **Linux** (Ubuntu, Debian, Fedora, Arch, etc.)
-- **Windows** (native + WSL2)
+- **macOS** (Apple Silicon + Intel)
+- **Windows** (PowerShell 5.1+)
 
-## Installation
+## Quick Start
 
-### Download Binary
-
-Download from [GitHub Releases](https://github.com/greywen/KillClaws/releases).
-
-### Build from Source
+### Linux / macOS
 
 ```bash
-go install github.com/greywen/KillClaws/cmd/killclaws@latest
+curl -fsSL https://raw.githubusercontent.com/greywen/KillClaws/main/killclaws.sh | bash
 ```
 
-Or clone and build:
+Or download and run manually:
 
 ```bash
-git clone https://github.com/greywen/KillClaws.git
-cd KillClaws
-go build -o killclaws ./cmd/killclaws
+curl -fsSL -o killclaws.sh https://raw.githubusercontent.com/greywen/KillClaws/main/killclaws.sh
+chmod +x killclaws.sh
+./killclaws.sh
+```
+
+### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/greywen/KillClaws/main/killclaws.ps1 | iex
+```
+
+Or download and run manually:
+
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/greywen/KillClaws/main/killclaws.ps1 -OutFile killclaws.ps1
+powershell -ExecutionPolicy Bypass -File killclaws.ps1
 ```
 
 ## Usage
 
-### Scan (see what's installed)
+### Linux / macOS (`killclaws.sh`)
 
 ```bash
-killclaws scan              # Human-readable output
-killclaws scan --json       # JSON output for automation
+./killclaws.sh              # Interactive: scan → select → remove
+./killclaws.sh --scan       # Scan only, show what's installed
+./killclaws.sh --yes        # Remove all detected products without prompting
+./killclaws.sh --dry-run    # Preview what would be removed
+./killclaws.sh --help       # Show help
 ```
 
-### Remove all Claw products
+### Windows (`killclaws.ps1`)
 
-```bash
-killclaws                   # Interactive: scan → confirm → remove
-killclaws --yes             # Skip confirmation
-killclaws --dry-run         # Preview only, change nothing
+```powershell
+.\killclaws.ps1             # Interactive: scan → select → remove
+.\killclaws.ps1 -Scan       # Scan only
+.\killclaws.ps1 -Yes        # Remove all without prompting
+.\killclaws.ps1 -DryRun     # Preview removal actions
+.\killclaws.ps1 -Help       # Show help
 ```
 
-### Selective removal
+## How It Works
 
-```bash
-killclaws --only openclaw           # Only remove OpenClaw
-killclaws --only openclaw,qclaw     # Remove specific products
-killclaws --exclude zeroclaw        # Remove all except ZeroClaw
-```
-
-### Other
-
-```bash
-killclaws --verbose         # Detailed output
-killclaws --version         # Show version
-killclaws help              # Show help
-```
-
-## What Gets Removed
-
-### OpenClaw (most complex)
-
-| Artifact | Path |
-|----------|------|
-| State + config | `~/.openclaw/` |
-| Legacy ClawdBot | `~/.clawdbot/` |
-| Legacy MoltBot | `~/.molthub/` |
-| Legacy workspace | `~/clawd/` |
-| npm global package | `openclaw` |
-| macOS App | `/Applications/OpenClaw.app` |
-| macOS LaunchAgent | `~/Library/LaunchAgents/ai.openclaw.gateway.plist` |
-| Linux systemd | `~/.config/systemd/user/openclaw-gateway.service` |
-| Windows schtasks | `OpenClaw Gateway` scheduled task |
-
-### QClaw / WorkBuddy
-
-| Artifact | Path |
-|----------|------|
-| macOS App | `/Applications/QClaw.app` or `/Applications/WorkBuddy.app` |
-| Config | `~/.qclaw/` or `~/.workbuddy/` |
-| macOS Library | `~/Library/Application Support/QClaw/` etc. |
-| Windows data | `%APPDATA%\QClaw\` etc. |
-
-### ZeroClaw / PicoClaw
-
-| Artifact | Path |
-|----------|------|
-| Config | `~/.zeroclaw/` or `~/.picoclaw/` |
-| Binary | In `$PATH` |
+1. **Scan** — Detects installed Claw products by checking config directories, package managers (npm/pip), running processes, services, and platform-specific locations.
+2. **Display** — Shows a numbered list of detected products with details (paths, sizes, running processes).
+3. **Select** — You choose which products to remove (or use `--yes` to remove all).
+4. **Remove** — Stops processes, unloads services, uninstalls packages, and deletes config/data directories.
 
 ## Post-Removal Reminders
 
@@ -116,20 +89,7 @@ After running KillClaws, you may still need to manually:
 - **Revoke API keys** — OpenAI, Anthropic, Moonshot, etc.
 - **Disconnect chat bots** — WhatsApp, Telegram, Discord, Slack
 - **Remove OAuth tokens** — In platform security settings
-- **Remove browser extensions** — OpenClaw Chrome extension
-
-## Development
-
-```bash
-# Build
-go build -o killclaws ./cmd/killclaws
-
-# Test
-go test ./... -v
-
-# Cross-compile
-GOOS=linux GOARCH=amd64 go build -o dist/killclaws-linux-amd64 ./cmd/killclaws
-```
+- **Remove browser extensions** — OpenClaw Chrome extension, etc.
 
 ## License
 

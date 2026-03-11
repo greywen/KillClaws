@@ -9,185 +9,77 @@ permissions:
   contents: write
 
 jobs:
-  # Run full test suite before releasing
-  test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  # Run CI checks before releasing
+  ci:
+    uses: ./.github/workflows/ci.yml
 
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
-
-      - name: Test
-        run: go test -v -race -count=1 ./...
-
-  # Build binaries for all platforms
-  build:
-    needs: test
+  # Create GitHub Release with scripts
+  release:
+    needs: ci
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
 
       - name: Get version from tag
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
 
-      - name: Build all platforms
-        env:
-          VERSION: ${{ steps.version.outputs.VERSION }}
+      - name: Create release archive
         run: |
-          LDFLAGS="-s -w -X main.version=${VERSION}"
           mkdir -p dist
-
-          # Linux
-          GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/killclaws-linux-amd64 ./cmd/killclaws
-          GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/killclaws-linux-arm64 ./cmd/killclaws
-
-          # macOS
-          GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/killclaws-darwin-amd64 ./cmd/killclaws
-          GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/killclaws-darwin-arm64 ./cmd/killclaws
-
-          # Windows
-          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/killclaws-windows-amd64.exe ./cmd/killclaws
-          GOOS=windows GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/killclaws-windows-arm64.exe ./cmd/killclaws
-
-      - name: Create archives
-        run: |
+          cp killclaws.sh dist/
+          cp killclaws.ps1 dist/
           cd dist
-
-          # Linux
-          tar czf killclaws-linux-amd64.tar.gz killclaws-linux-amd64
-          tar czf killclaws-linux-arm64.tar.gz killclaws-linux-arm64
-
-          # macOS
-          tar czf killclaws-darwin-amd64.tar.gz killclaws-darwin-amd64
-          tar czf killclaws-darwin-arm64.tar.gz killclaws-darwin-arm64
-
-          # Windows
-          zip killclaws-windows-amd64.zip killclaws-windows-amd64.exe
-          zip killclaws-windows-arm64.zip killclaws-windows-arm64.exe
-
-          # Checksums
-          sha256sum *.tar.gz *.zip > checksums.txt
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-binaries
-          path: dist/*.tar.gz
-          retention-days: 1
-
-      - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-binaries-windows
-          path: dist/*.zip
-          retention-days: 1
-
-      - name: Upload checksums
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-checksums
-          path: dist/checksums.txt
-          retention-days: 1
-
-  # Create GitHub Release with all artifacts
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Collect release files
-        run: |
-          mkdir -p release
-          cp artifacts/release-binaries/*.tar.gz release/
-          cp artifacts/release-binaries-windows/*.zip release/
-          cp artifacts/release-checksums/checksums.txt release/
-          ls -la release/
-
-      - name: Generate release notes
-        id: notes
-        run: |
-          VERSION="${GITHUB_REF_NAME}"
-          cat > release-notes.md << 'NOTES_EOF'
-          ## KillClaws ${{ github.ref_name }}
-
-          One command to remove all Claw products from your system.
-
-          ### Supported Products
-          - **OpenClaw** — npm package, services, configs, legacy paths
-          - **QClaw** — Tencent GUI app + configs
-          - **WorkBuddy** — Tencent CodeBuddy + configs
-          - **ZeroClaw** — Rust binary + configs
-          - **PicoClaw** — Go binary + configs
-          - **KimiCLI** — pip package + configs
-
-          ### Download
-
-          | Platform | Architecture | File |
-          |----------|-------------|------|
-          | Linux | x86_64 | `killclaws-linux-amd64.tar.gz` |
-          | Linux | ARM64 | `killclaws-linux-arm64.tar.gz` |
-          | macOS | Intel | `killclaws-darwin-amd64.tar.gz` |
-          | macOS | Apple Silicon | `killclaws-darwin-arm64.tar.gz` |
-          | Windows | x86_64 | `killclaws-windows-amd64.zip` |
-          | Windows | ARM64 | `killclaws-windows-arm64.zip` |
-
-          ### Quick Start
-
-          ```bash
-          # Linux/macOS
-          tar xzf killclaws-*.tar.gz
-          chmod +x killclaws-*
-          ./killclaws-* scan        # See what's installed
-          ./killclaws-* --yes       # Remove all
-
-          # Windows (PowerShell)
-          Expand-Archive killclaws-windows-amd64.zip
-          .\killclaws-windows-amd64.exe scan
-          .\killclaws-windows-amd64.exe --yes
-          ```
-
-          ### Verify Checksums
-
-          ```bash
-          sha256sum -c checksums.txt
-          ```
-          NOTES_EOF
+          tar czf killclaws-${{ steps.version.outputs.VERSION }}.tar.gz killclaws.sh killclaws.ps1
+          zip killclaws-${{ steps.version.outputs.VERSION }}.zip killclaws.sh killclaws.ps1
+          sha256sum *.tar.gz *.zip killclaws.sh killclaws.ps1 > checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          body_path: release-notes.md
+          body: |
+            ## KillClaws ${{ steps.version.outputs.VERSION }}
+
+            One command to remove all Claw AI products from your system.
+
+            ### Quick Start
+
+            **Linux / macOS:**
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/greywen/KillClaws/${{ steps.version.outputs.VERSION }}/killclaws.sh | bash
+            ```
+
+            **Windows (PowerShell):**
+            ```powershell
+            irm https://raw.githubusercontent.com/greywen/KillClaws/${{ steps.version.outputs.VERSION }}/killclaws.ps1 | iex
+            ```
+
+            ### Supported Products
+            - **OpenClaw** — npm package, services, configs, legacy paths
+            - **QClaw** — App + configs
+            - **WorkBuddy** — npm package + configs
+            - **ZeroClaw** — Binary + configs
+            - **PicoClaw** — Binary + configs
+            - **KimiCLI** — pip package + configs
+
+            ### Downloads
+
+            | File | Description |
+            |------|-------------|
+            | `killclaws.sh` | Linux/macOS bash script |
+            | `killclaws.ps1` | Windows PowerShell script |
+            | `killclaws-*.tar.gz` | Archive (both scripts) |
+            | `killclaws-*.zip` | Archive (both scripts) |
+            | `checksums.txt` | SHA256 checksums |
           files: |
-            release/killclaws-linux-amd64.tar.gz
-            release/killclaws-linux-arm64.tar.gz
-            release/killclaws-darwin-amd64.tar.gz
-            release/killclaws-darwin-arm64.tar.gz
-            release/killclaws-windows-amd64.zip
-            release/killclaws-windows-arm64.zip
-            release/checksums.txt
+            dist/killclaws.sh
+            dist/killclaws.ps1
+            dist/killclaws-${{ steps.version.outputs.VERSION }}.tar.gz
+            dist/killclaws-${{ steps.version.outputs.VERSION }}.zip
+            dist/checksums.txt
           draft: false
           prerelease: false
           generate_release_notes: true

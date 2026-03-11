@@ -1,19 +1,7 @@
-# Binaries
-/killclaws
-/killclaws.exe
-*.dll
-*.so
-*.dylib
-
-# Build output
-/bin/
-/dist/
-
-# Test
-*.test
-*.out
-coverage.txt
-coverage.html
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
 
 # IDE
 .idea/
@@ -21,10 +9,3 @@ coverage.html
 *.swp
 *.swo
 *~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Go
-vendor/
