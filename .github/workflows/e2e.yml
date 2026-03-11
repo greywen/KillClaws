@@ -95,7 +95,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
-          & .\killclaws.ps1 -Scan
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Scan
 
       - name: Install OpenClaw via npm
         shell: pwsh
@@ -112,7 +113,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
-          $output = & .\killclaws.ps1 -Scan *>&1 | Out-String
+          $PSNativeCommandUseErrorActionPreference = $false
+          $output = pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Scan 2>&1 | Out-String
           Write-Host $output
           if ($output -notmatch "OpenClaw") {
             Write-Error "FAIL: OpenClaw not detected"
@@ -124,7 +126,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
-          & .\killclaws.ps1 -DryRun -Yes
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -DryRun -Yes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify dry-run preserved files
         shell: pwsh
@@ -139,7 +143,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
-          & .\killclaws.ps1 -Yes
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Yes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify state directory removed
         shell: pwsh
@@ -154,7 +160,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
-          & .\killclaws.ps1 -Scan
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Scan
 
   # ============================================================
   # ZeroClaw — binary install → scan → uninstall → verify
@@ -513,7 +520,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
-          $output = & .\killclaws.ps1 -Scan *>&1 | Out-String
+          $PSNativeCommandUseErrorActionPreference = $false
+          $output = pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Scan 2>&1 | Out-String
           Write-Host $output
           foreach ($name in @("QClaw", "ZeroClaw", "PicoClaw", "KimiCLI")) {
             if ($output -notmatch $name) {
@@ -527,7 +535,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
-          & .\killclaws.ps1 -DryRun -Yes
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -DryRun -Yes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify dry-run preserved files
         shell: pwsh
@@ -544,7 +554,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
-          & .\killclaws.ps1 -Yes
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Yes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify all removed
         shell: pwsh
