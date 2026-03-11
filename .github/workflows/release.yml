@@ -48,17 +48,23 @@ jobs:
 
             One command to remove all Claw AI products from your system.
 
-            ### Quick Start
+            一条命令，卸载系统中所有 Claw AI 产品。
+
+            ---
+
+            ### Quick Start / 快速开始
 
             **Linux / macOS:**
             ```bash
             curl -fsSL https://raw.githubusercontent.com/greywen/KillClaws/${{ steps.version.outputs.VERSION }}/killclaws.sh | bash
             ```
 
-            **macOS — 双击运行:**
+            **macOS — Double-click / 双击运行:**
+            Download `killclaws.command`, double-click to run in Terminal.
             下载 `killclaws.command`，双击即可在终端中运行。
 
-            **Windows — 双击运行:**
+            **Windows — Double-click / 双击运行:**
+            Download `killclaws.bat`, double-click to run.
             下载 `killclaws.bat`，双击即可运行。
 
             **Windows (PowerShell):**
@@ -66,25 +72,29 @@ jobs:
             irm https://raw.githubusercontent.com/greywen/KillClaws/${{ steps.version.outputs.VERSION }}/killclaws.ps1 | iex
             ```
 
-            ### Supported Products
-            - **OpenClaw** — npm package, services, configs, legacy paths
-            - **QClaw** — App + configs
-            - **WorkBuddy** — npm package + configs
-            - **ZeroClaw** — Binary + configs
-            - **PicoClaw** — Binary + configs
-            - **KimiCLI** — pip package + configs
+            ### Supported Products / 支持的产品
+            - **OpenClaw** — npm package, services, configs, legacy paths / npm 包、服务、配置、旧路径
+            - **QClaw** — App + configs / 应用 + 配置
+            - **WorkBuddy** — npm package + configs / npm 包 + 配置
+            - **ZeroClaw** — Binary + configs / 二进制文件 + 配置
+            - **PicoClaw** — Binary + configs / 二进制文件 + 配置
+            - **KimiCLI** — pip package + configs / pip 包 + 配置
 
-            ### Downloads
+            ### Downloads / 下载
 
-            | File | Description |
+            | File / 文件 | Description / 说明 |
             |------|-------------|
-            | `killclaws.command` | **macOS 双击运行** (推荐) |
-            | `killclaws.bat` | **Windows 双击运行** (推荐) |
-            | `killclaws.sh` | Linux/macOS bash script |
-            | `killclaws.ps1` | Windows PowerShell script |
-            | `killclaws-*.tar.gz` | Archive (all scripts) |
-            | `killclaws-*.zip` | Archive (all scripts) |
-            | `checksums.txt` | SHA256 checksums |
+            | `killclaws.bat` | **Windows double-click launcher / Windows 双击运行**（推荐） |
+            | `killclaws.command` | **macOS double-click launcher / macOS 双击运行**（推荐） |
+            | `killclaws.sh` | Linux/macOS bash script / Linux/macOS 脚本 |
+            | `killclaws.ps1` | Windows PowerShell script / Windows 脚本 |
+            | `killclaws-*.tar.gz` | Archive (all scripts) / 压缩包（全部脚本） |
+            | `killclaws-*.zip` | Archive (all scripts) / 压缩包（全部脚本） |
+            | `checksums.txt` | SHA256 checksums / SHA256 校验和 |
+
+            ---
+
+            📖 [English Documentation](https://github.com/greywen/KillClaws/blob/main/README.md) | [中文文档](https://github.com/greywen/KillClaws/blob/main/README.zh-CN.md)
           files: |
             dist/killclaws.command
             dist/killclaws.bat
