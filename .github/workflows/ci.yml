@@ -58,14 +58,17 @@ jobs:
         run: .\killclaws.ps1 -Scan
 
       - name: PowerShell 5.1 parse check (Windows built-in)
-        shell: cmd
-        run: >
-          powershell -NoProfile -Command
-          "$tokens = $null; $errors = $null;
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile(
-          (Join-Path $PWD 'killclaws.ps1'), [ref]$tokens, [ref]$errors) | Out-Null;
-          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 };
-          Write-Host 'PS 5.1 parse OK'"
+            (Join-Path $PWD "killclaws.ps1"), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+          Write-Host "PS 5.1 parse OK"
 
   smoke-bash-macos:
     runs-on: macos-latest
