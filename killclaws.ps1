@@ -38,7 +38,7 @@ function Stop-ProcessByName($name) {
     if ($procs) {
         foreach ($p in $procs) {
             if ($DryRun) {
-                Write-Ok "[dry-run] Would stop process $name (PID $($p.Id))"
+                Write-Ok "`[dry-run`] Would stop process $name (PID $($p.Id))"
             } else {
                 try {
                     $p | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -56,7 +56,7 @@ function Stop-ProcessByName($name) {
 function Remove-PathSafe($path) {
     if (Test-Path $path) {
         if ($DryRun) {
-            Write-Ok "[dry-run] Would remove $path"
+            Write-Ok "`[dry-run`] Would remove $path"
         } else {
             try {
                 Remove-Item -Path $path -Recurse -Force -ErrorAction Stop
@@ -317,7 +317,7 @@ function Remove-OpenClaw {
             $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue 2>$null
             if ($task) {
                 if ($DryRun) {
-                    Write-Ok "[dry-run] Would remove scheduled task: $taskName"
+                    Write-Ok "`[dry-run`] Would remove scheduled task: $taskName"
                 } else {
                     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
                     Write-Ok "Removed scheduled task: $taskName"
@@ -335,7 +335,7 @@ function Remove-OpenClaw {
                 $out = & $mgr list -g openclaw 2>$null
                 if ($LASTEXITCODE -eq 0 -and $out -match "openclaw") {
                     if ($DryRun) {
-                        Write-Ok "[dry-run] Would uninstall: $mgr rm -g openclaw"
+                        Write-Ok "`[dry-run`] Would uninstall: $mgr rm -g openclaw"
                     } else {
                         & $mgr rm -g openclaw 2>$null
                         Write-Ok "Uninstalled $mgr package: openclaw"
@@ -377,7 +377,7 @@ function Remove-WorkBuddy {
                 $out = & $mgr list -g "@tencent-ai/codebuddy-code" 2>$null
                 if ($LASTEXITCODE -eq 0 -and $out -match "codebuddy") {
                     if ($DryRun) {
-                        Write-Ok "[dry-run] Would uninstall: $mgr rm -g @tencent-ai/codebuddy-code"
+                        Write-Ok "`[dry-run`] Would uninstall: $mgr rm -g @tencent-ai/codebuddy-code"
                     } else {
                         & $mgr rm -g "@tencent-ai/codebuddy-code" 2>$null
                         Write-Ok "Uninstalled $mgr package: @tencent-ai/codebuddy-code"
@@ -404,7 +404,7 @@ function Remove-ZeroClaw {
     if (Test-CmdExists "zeroclaw") {
         $bin = (Get-Command zeroclaw).Source
         if ($DryRun) {
-            Write-Ok "[dry-run] Would remove binary: $bin"
+            Write-Ok "`[dry-run`] Would remove binary: $bin"
         } else {
             Remove-Item $bin -Force -ErrorAction SilentlyContinue
             Write-Ok "Removed binary: $bin"
@@ -419,7 +419,7 @@ function Remove-PicoClaw {
     if (Test-CmdExists "picoclaw") {
         $bin = (Get-Command picoclaw).Source
         if ($DryRun) {
-            Write-Ok "[dry-run] Would remove binary: $bin"
+            Write-Ok "`[dry-run`] Would remove binary: $bin"
         } else {
             Remove-Item $bin -Force -ErrorAction SilentlyContinue
             Write-Ok "Removed binary: $bin"
@@ -435,7 +435,7 @@ function Remove-KimiCLI {
                 $out = & $pip show kimi-cli 2>$null
                 if ($LASTEXITCODE -eq 0 -and $out) {
                     if ($DryRun) {
-                        Write-Ok "[dry-run] Would uninstall: $pip uninstall -y kimi-cli"
+                        Write-Ok "`[dry-run`] Would uninstall: $pip uninstall -y kimi-cli"
                     } else {
                         & $pip uninstall -y kimi-cli 2>$null
                         Write-Ok "Uninstalled $pip package: kimi-cli"
@@ -451,7 +451,7 @@ function Remove-KimiCLI {
     if (Test-CmdExists "kimi") {
         $bin = (Get-Command kimi).Source
         if ($DryRun) {
-            Write-Ok "[dry-run] Would remove binary: $bin"
+            Write-Ok "`[dry-run`] Would remove binary: $bin"
         } else {
             Remove-Item $bin -Force -ErrorAction SilentlyContinue
             Write-Ok "Removed binary: $bin"
@@ -522,7 +522,7 @@ Write-Host "Found $($detected.Count) Claw product(s):" -ForegroundColor White
 Write-Host ""
 
 for ($i = 0; $i -lt $detected.Count; $i++) {
-    Write-Host "  [$($i+1)] " -NoNewline
+    Write-Host "  `[$($i+1)`] " -NoNewline
     Write-Host $detected[$i].Name -ForegroundColor Cyan
     foreach ($line in $detected[$i].Details) {
         Write-Host $line
@@ -542,7 +542,8 @@ $selection = ""
 if ($Yes) {
     $selection = "all"
 } else {
-    $selection = Read-Host "Select products to remove (comma-separated numbers, 'all', or 'q' to quit)"
+    $prompt = "Select products to remove (comma-separated numbers, all, or q to quit)"
+    $selection = Read-Host $prompt
     if ([string]::IsNullOrEmpty($selection) -or $selection -eq "q") {
         Write-Host "Aborted."
         exit 0
