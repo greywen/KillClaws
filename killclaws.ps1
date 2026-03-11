@@ -94,10 +94,14 @@ function Detect-OpenClaw {
     # npm global
     foreach ($mgr in @("npm", "pnpm", "bun")) {
         if (Test-CmdExists $mgr) {
-            $out = & $mgr list -g openclaw 2>$null
-            if ($out -match "openclaw") {
-                $details += "      pkg  ${mgr}: openclaw"
-                $found = $true
+            try {
+                $out = & $mgr list -g openclaw 2>$null
+                if ($LASTEXITCODE -eq 0 -and $out -match "openclaw") {
+                    $details += "      pkg  ${mgr}: openclaw"
+                    $found = $true
+                }
+            } catch {
+                # Command failed — ignore
             }
         }
     }
@@ -112,10 +116,14 @@ function Detect-OpenClaw {
 
     # Windows scheduled tasks
     foreach ($taskName in @("OpenClaw Gateway", "openclaw-gateway")) {
-        $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-        if ($task) {
-            $details += "      svc  Scheduled Task: $taskName"
-            $found = $true
+        try {
+            $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue 2>$null
+            if ($task) {
+                $details += "      svc  Scheduled Task: $taskName"
+                $found = $true
+            }
+        } catch {
+            # Task not found — ignore
         }
     }
 
@@ -185,10 +193,14 @@ function Detect-WorkBuddy {
     # npm global
     foreach ($mgr in @("npm", "pnpm", "bun")) {
         if (Test-CmdExists $mgr) {
-            $out = & $mgr list -g "@tencent-ai/codebuddy-code" 2>$null
-            if ($out -match "codebuddy") {
-                $details += "      pkg  ${mgr}: @tencent-ai/codebuddy-code"
-                $found = $true
+            try {
+                $out = & $mgr list -g "@tencent-ai/codebuddy-code" 2>$null
+                if ($LASTEXITCODE -eq 0 -and $out -match "codebuddy") {
+                    $details += "      pkg  ${mgr}: @tencent-ai/codebuddy-code"
+                    $found = $true
+                }
+            } catch {
+                # Command failed — ignore
             }
         }
     }
@@ -271,11 +283,15 @@ function Detect-KimiCLI {
 
     foreach ($pip in @("pip3", "pip")) {
         if (Test-CmdExists $pip) {
-            $out = & $pip show kimi-cli 2>$null
-            if ($LASTEXITCODE -eq 0 -and $out) {
-                $details += "      pkg  ${pip}: kimi-cli"
-                $found = $true
-                break
+            try {
+                $out = & $pip show kimi-cli 2>$null
+                if ($LASTEXITCODE -eq 0 -and $out) {
+                    $details += "      pkg  ${pip}: kimi-cli"
+                    $found = $true
+                    break
+                }
+            } catch {
+                # Command failed — ignore
             }
         }
     }
@@ -297,28 +313,36 @@ function Remove-OpenClaw {
 
     # Scheduled tasks
     foreach ($taskName in @("OpenClaw Gateway", "openclaw-gateway")) {
-        $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-        if ($task) {
-            if ($DryRun) {
-                Write-Ok "[dry-run] Would remove scheduled task: $taskName"
-            } else {
-                Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
-                Write-Ok "Removed scheduled task: $taskName"
+        try {
+            $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue 2>$null
+            if ($task) {
+                if ($DryRun) {
+                    Write-Ok "[dry-run] Would remove scheduled task: $taskName"
+                } else {
+                    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+                    Write-Ok "Removed scheduled task: $taskName"
+                }
             }
+        } catch {
+            # Task not found — ignore
         }
     }
 
     # npm packages
     foreach ($mgr in @("npm", "pnpm", "bun")) {
         if (Test-CmdExists $mgr) {
-            $out = & $mgr list -g openclaw 2>$null
-            if ($out -match "openclaw") {
-                if ($DryRun) {
-                    Write-Ok "[dry-run] Would uninstall: $mgr rm -g openclaw"
-                } else {
-                    & $mgr rm -g openclaw 2>$null
-                    Write-Ok "Uninstalled $mgr package: openclaw"
+            try {
+                $out = & $mgr list -g openclaw 2>$null
+                if ($LASTEXITCODE -eq 0 -and $out -match "openclaw") {
+                    if ($DryRun) {
+                        Write-Ok "[dry-run] Would uninstall: $mgr rm -g openclaw"
+                    } else {
+                        & $mgr rm -g openclaw 2>$null
+                        Write-Ok "Uninstalled $mgr package: openclaw"
+                    }
                 }
+            } catch {
+                # Command failed — ignore
             }
         }
     }
@@ -349,14 +373,18 @@ function Remove-WorkBuddy {
 
     foreach ($mgr in @("npm", "pnpm", "bun")) {
         if (Test-CmdExists $mgr) {
-            $out = & $mgr list -g "@tencent-ai/codebuddy-code" 2>$null
-            if ($out -match "codebuddy") {
-                if ($DryRun) {
-                    Write-Ok "[dry-run] Would uninstall: $mgr rm -g @tencent-ai/codebuddy-code"
-                } else {
-                    & $mgr rm -g "@tencent-ai/codebuddy-code" 2>$null
-                    Write-Ok "Uninstalled $mgr package: @tencent-ai/codebuddy-code"
+            try {
+                $out = & $mgr list -g "@tencent-ai/codebuddy-code" 2>$null
+                if ($LASTEXITCODE -eq 0 -and $out -match "codebuddy") {
+                    if ($DryRun) {
+                        Write-Ok "[dry-run] Would uninstall: $mgr rm -g @tencent-ai/codebuddy-code"
+                    } else {
+                        & $mgr rm -g "@tencent-ai/codebuddy-code" 2>$null
+                        Write-Ok "Uninstalled $mgr package: @tencent-ai/codebuddy-code"
+                    }
                 }
+            } catch {
+                # Command failed — ignore
             }
         }
     }
@@ -403,15 +431,19 @@ function Remove-KimiCLI {
     Write-Host "`n  Removing KimiCLI..." -ForegroundColor White
     foreach ($pip in @("pip3", "pip")) {
         if (Test-CmdExists $pip) {
-            $out = & $pip show kimi-cli 2>$null
-            if ($LASTEXITCODE -eq 0 -and $out) {
-                if ($DryRun) {
-                    Write-Ok "[dry-run] Would uninstall: $pip uninstall -y kimi-cli"
-                } else {
-                    & $pip uninstall -y kimi-cli 2>$null
-                    Write-Ok "Uninstalled $pip package: kimi-cli"
+            try {
+                $out = & $pip show kimi-cli 2>$null
+                if ($LASTEXITCODE -eq 0 -and $out) {
+                    if ($DryRun) {
+                        Write-Ok "[dry-run] Would uninstall: $pip uninstall -y kimi-cli"
+                    } else {
+                        & $pip uninstall -y kimi-cli 2>$null
+                        Write-Ok "Uninstalled $pip package: kimi-cli"
+                    }
+                    break
                 }
-                break
+            } catch {
+                # Command failed — ignore
             }
         }
     }

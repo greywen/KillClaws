@@ -93,7 +93,9 @@ jobs:
 
       - name: Pre-install scan
         shell: pwsh
-        run: .\killclaws.ps1 -Scan
+        run: |
+          $ErrorActionPreference = "Continue"
+          & .\killclaws.ps1 -Scan
 
       - name: Install OpenClaw via npm
         shell: pwsh
@@ -109,7 +111,8 @@ jobs:
       - name: Post-install scan (should detect OpenClaw)
         shell: pwsh
         run: |
-          $output = .\killclaws.ps1 -Scan *>&1 | Out-String
+          $ErrorActionPreference = "Continue"
+          $output = & .\killclaws.ps1 -Scan *>&1 | Out-String
           Write-Host $output
           if ($output -notmatch "OpenClaw") {
             Write-Error "FAIL: OpenClaw not detected"
@@ -119,7 +122,9 @@ jobs:
 
       - name: Run KillClaws (dry-run)
         shell: pwsh
-        run: .\killclaws.ps1 -DryRun -Yes
+        run: |
+          $ErrorActionPreference = "Continue"
+          & .\killclaws.ps1 -DryRun -Yes
 
       - name: Verify dry-run preserved files
         shell: pwsh
@@ -132,7 +137,9 @@ jobs:
 
       - name: Run KillClaws (actual uninstall)
         shell: pwsh
-        run: .\killclaws.ps1 -Yes
+        run: |
+          $ErrorActionPreference = "Continue"
+          & .\killclaws.ps1 -Yes
 
       - name: Verify state directory removed
         shell: pwsh
@@ -145,7 +152,9 @@ jobs:
 
       - name: Post-uninstall scan
         shell: pwsh
-        run: .\killclaws.ps1 -Scan
+        run: |
+          $ErrorActionPreference = "Continue"
+          & .\killclaws.ps1 -Scan
 
   # ============================================================
   # ZeroClaw — binary install → scan → uninstall → verify
@@ -503,7 +512,8 @@ jobs:
       - name: Scan should detect products
         shell: pwsh
         run: |
-          $output = .\killclaws.ps1 -Scan *>&1 | Out-String
+          $ErrorActionPreference = "Continue"
+          $output = & .\killclaws.ps1 -Scan *>&1 | Out-String
           Write-Host $output
           foreach ($name in @("QClaw", "ZeroClaw", "PicoClaw", "KimiCLI")) {
             if ($output -notmatch $name) {
@@ -515,7 +525,9 @@ jobs:
 
       - name: Run KillClaws (dry-run)
         shell: pwsh
-        run: .\killclaws.ps1 -DryRun -Yes
+        run: |
+          $ErrorActionPreference = "Continue"
+          & .\killclaws.ps1 -DryRun -Yes
 
       - name: Verify dry-run preserved files
         shell: pwsh
@@ -530,7 +542,9 @@ jobs:
 
       - name: Run KillClaws (actual uninstall)
         shell: pwsh
-        run: .\killclaws.ps1 -Yes
+        run: |
+          $ErrorActionPreference = "Continue"
+          & .\killclaws.ps1 -Yes
 
       - name: Verify all removed
         shell: pwsh
