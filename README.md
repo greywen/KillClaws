@@ -10,7 +10,7 @@
 
 ---
 
-The Claw ecosystem (OpenClaw, QClaw, WorkBuddy, ZeroClaw, PicoClaw, KimiCLI, etc.) has exploded in popularity. Many users installed multiple products to try them out, granting extensive permissions along the way. **KillClaws** scans your system, shows what's installed, lets you pick which to remove, and cleans everything up — configs, packages, services, binaries — in one command.
+The Claw ecosystem (OpenClaw, QClaw, WorkBuddy, ZeroClaw, PicoClaw, KimiCLI, ClawCoder, QuectoClaw, etc.) has exploded in popularity. Many users installed multiple products to try them out, granting extensive permissions along the way. **KillClaws** scans your system, shows what's installed, lets you pick which to remove, and cleans everything up — configs, packages, services, binaries — in one command.
 
 ## Supported Products
 
@@ -22,6 +22,8 @@ The Claw ecosystem (OpenClaw, QClaw, WorkBuddy, ZeroClaw, PicoClaw, KimiCLI, etc
 | **ZeroClaw** | Community | Binary, configs (~/.zeroclaw) |
 | **PicoClaw** | Sipeed | Binary, configs (~/.picoclaw) |
 | **KimiCLI** | Moonshot AI | pip package (kimi-cli), binary, configs (~/.kimi) |
+| **ClawCoder** | Jason Sang | pip package (clawcoder), launchers (clawcode/clawcoder), configs (~/.clawcoder), Windows installer dir (%LOCALAPPDATA%\ClawCoder) |
+| **QuectoClaw** | Community | Binary/Homebrew formula (quectoclaw), configs + workspace (~/.quectoclaw) |
 
 ## Supported Platforms
 
@@ -289,12 +291,12 @@ KillClaws looks for specific config directories and packages. If a product was a
 
 ```bash
 # Linux/macOS
-ls -la ~/.openclaw ~/.qclaw ~/.workbuddy ~/.zeroclaw ~/.picoclaw ~/.kimi 2>/dev/null
+ls -la ~/.openclaw ~/.qclaw ~/.workbuddy ~/.zeroclaw ~/.picoclaw ~/.kimi ~/.clawcoder ~/.quectoclaw 2>/dev/null
 ```
 
 ```powershell
 # Windows
-Get-ChildItem ~\.openclaw, ~\.qclaw, ~\.workbuddy, ~\.zeroclaw, ~\.picoclaw, ~\.kimi -ErrorAction SilentlyContinue
+Get-ChildItem ~\.openclaw, ~\.qclaw, ~\.workbuddy, ~\.zeroclaw, ~\.picoclaw, ~\.kimi, ~\.clawcoder, ~\.quectoclaw -ErrorAction SilentlyContinue
 ```
 
 ---

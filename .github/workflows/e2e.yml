@@ -448,6 +448,298 @@ jobs:
           exit 0
 
   # ============================================================
+  # ClawCoder — pip install + launcher cleanup
+  # ============================================================
+  e2e-clawcoder:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install ClawCoder via pip
+        run: pip install clawcoder
+        continue-on-error: true
+
+      - name: Ensure ClawCoder launcher exists
+        run: |
+          if ! command -v clawcode >/dev/null 2>&1 && ! command -v clawcoder >/dev/null 2>&1; then
+            mkdir -p "$HOME/.local/bin"
+            printf '#!/bin/bash\necho "clawcode 1.0.3"\n' > "$HOME/.local/bin/clawcode"
+            chmod +x "$HOME/.local/bin/clawcode"
+            cp "$HOME/.local/bin/clawcode" "$HOME/.local/bin/clawcoder"
+            chmod +x "$HOME/.local/bin/clawcoder"
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Create ClawCoder config
+        run: |
+          mkdir -p ~/.clawcoder
+          echo '{"api_key": "test", "model": "k2p5"}' > ~/.clawcoder/config.json
+
+      - name: Scan should detect ClawCoder
+        run: |
+          OUTPUT=$(bash killclaws.sh --scan 2>&1)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -qi "clawcoder" || { echo "FAIL: ClawCoder not detected"; exit 1; }
+          echo "PASS: ClawCoder detected"
+
+      - name: Run KillClaws (uninstall)
+        run: bash killclaws.sh --yes
+
+      - name: Verify ClawCoder config removed
+        run: |
+          if [ -d "$HOME/.clawcoder" ]; then
+            echo "FAIL: ~/.clawcoder still exists"
+            exit 1
+          fi
+          echo "PASS: ClawCoder config removed"
+
+      - name: Verify ClawCoder launcher removed
+        run: |
+          if command -v clawcode >/dev/null 2>&1 || command -v clawcoder >/dev/null 2>&1; then
+            echo "FAIL: ClawCoder launcher still exists"
+            command -v clawcode || true
+            command -v clawcoder || true
+            exit 1
+          fi
+          echo "PASS: ClawCoder launcher removed"
+
+      - name: Verify pip package removed
+        run: |
+          if pip show clawcoder >/dev/null 2>&1 || pip3 show clawcoder >/dev/null 2>&1; then
+            echo "FAIL: clawcoder still installed via pip"
+            exit 1
+          fi
+          echo "PASS: ClawCoder pip package removed"
+
+  # ============================================================
+  # ClawCoder — Windows pip install + installer dir cleanup
+  # ============================================================
+  e2e-clawcoder-windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install ClawCoder via pip
+        shell: pwsh
+        run: pip install clawcoder
+        continue-on-error: true
+
+      - name: Create ClawCoder state
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.clawcoder" | Out-Null
+          '{"api_key": "test", "model": "k2p5"}' | Set-Content "$env:USERPROFILE\.clawcoder\config.json"
+          $installDir = Join-Path $env:LOCALAPPDATA "ClawCoder"
+          $binDir = Join-Path $installDir "bin"
+          New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+          @"
+@echo off
+echo ClawCoder 1.0.3
+"@ | Set-Content (Join-Path $binDir 'clawcode.cmd')
+          @"
+@echo off
+echo ClawCoder 1.0.3
+"@ | Set-Content (Join-Path $binDir 'clawcoder.cmd')
+          $binDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Scan should detect ClawCoder
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $output = pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Scan 2>&1 | Out-String
+          Write-Host $output
+          if ($output -notmatch "ClawCoder") {
+            Write-Error "FAIL: ClawCoder not detected"
+            exit 1
+          }
+          Write-Host "PASS: ClawCoder detected"
+
+      - name: Run KillClaws (uninstall)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Yes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify ClawCoder config removed
+        shell: pwsh
+        run: |
+          if (Test-Path "$env:USERPROFILE\.clawcoder") {
+            Write-Error "FAIL: .clawcoder still exists"
+            exit 1
+          }
+          Write-Host "PASS: ClawCoder config removed"
+
+      - name: Verify installer dir removed
+        shell: pwsh
+        run: |
+          if (Test-Path "$env:LOCALAPPDATA\ClawCoder") {
+            Write-Error "FAIL: %LOCALAPPDATA%\\ClawCoder still exists"
+            exit 1
+          }
+          Write-Host "PASS: ClawCoder installer dir removed"
+
+      - name: Verify launcher removed
+        shell: pwsh
+        run: |
+          if (Get-Command clawcode -ErrorAction SilentlyContinue) {
+            Write-Error "FAIL: clawcode launcher still exists"
+            exit 1
+          }
+          if (Get-Command clawcoder -ErrorAction SilentlyContinue) {
+            Write-Error "FAIL: clawcoder launcher still exists"
+            exit 1
+          }
+          Write-Host "PASS: ClawCoder launcher removed"
+
+      - name: Verify pip package removed
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $out = pip show clawcoder 2>&1 | Out-String
+          if ($LASTEXITCODE -eq 0 -and $out -match "Name:\s+clawcoder") {
+            Write-Error "FAIL: clawcoder still installed via pip"
+            exit 1
+          }
+          Write-Host "PASS: clawcoder pip package removed"
+          exit 0
+
+  # ============================================================
+  # QuectoClaw — binary install → scan → uninstall → verify
+  # ============================================================
+  e2e-quectoclaw:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install QuectoClaw binary
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          printf '#!/bin/bash\necho "quectoclaw v0.1.0"\n' > "$HOME/.local/bin/quectoclaw"
+          chmod +x "$HOME/.local/bin/quectoclaw"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Create QuectoClaw state
+        run: |
+          mkdir -p ~/.quectoclaw/workspace/plugins
+          echo '{"agents": {"defaults": {"workspace": "~/.quectoclaw/workspace"}}}' > ~/.quectoclaw/config.json
+          echo 'test workspace' > ~/.quectoclaw/workspace/IDENTITY.md
+
+      - name: Scan should detect QuectoClaw
+        run: |
+          OUTPUT=$(bash killclaws.sh --scan 2>&1)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -qi "quectoclaw" || { echo "FAIL: QuectoClaw not detected"; exit 1; }
+          echo "PASS: QuectoClaw detected"
+
+      - name: Run KillClaws (uninstall)
+        run: bash killclaws.sh --yes
+
+      - name: Verify QuectoClaw removal
+        run: |
+          if [ -d "$HOME/.quectoclaw" ]; then
+            echo "FAIL: ~/.quectoclaw still exists"
+            exit 1
+          fi
+          echo "PASS: QuectoClaw config removed"
+
+      - name: Verify QuectoClaw binary removed
+        run: |
+          if command -v quectoclaw >/dev/null 2>&1; then
+            echo "FAIL: quectoclaw binary still exists at $(command -v quectoclaw)"
+            exit 1
+          fi
+          echo "PASS: QuectoClaw binary removed"
+
+  # ============================================================
+  # QuectoClaw — Windows binary install → scan → uninstall → verify
+  # ============================================================
+  e2e-quectoclaw-windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create QuectoClaw state
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.quectoclaw\workspace" | Out-Null
+          '{"agents": {"defaults": {"workspace": "~/.quectoclaw/workspace"}}}' | Set-Content "$env:USERPROFILE\.quectoclaw\config.json"
+          'test workspace' | Set-Content "$env:USERPROFILE\.quectoclaw\workspace\IDENTITY.md"
+          $userBin = Join-Path $env:USERPROFILE "bin"
+          New-Item -ItemType Directory -Force -Path $userBin | Out-Null
+          @"
+@echo off
+echo QuectoClaw v0.1.0
+"@ | Set-Content (Join-Path $userBin 'quectoclaw.cmd')
+          $userBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Scan should detect QuectoClaw
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          $output = pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Scan 2>&1 | Out-String
+          Write-Host $output
+          if ($output -notmatch "QuectoClaw") {
+            Write-Error "FAIL: QuectoClaw not detected"
+            exit 1
+          }
+          Write-Host "PASS: QuectoClaw detected"
+
+      - name: Run KillClaws (uninstall)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+          pwsh -ExecutionPolicy Bypass -File .\killclaws.ps1 -Yes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify QuectoClaw removal
+        shell: pwsh
+        run: |
+          if (Test-Path "$env:USERPROFILE\.quectoclaw") {
+            Write-Error "FAIL: .quectoclaw still exists"
+            exit 1
+          }
+          Write-Host "PASS: QuectoClaw config removed"
+
+      - name: Verify QuectoClaw binary removed
+        shell: pwsh
+        run: |
+          if (Get-Command quectoclaw -ErrorAction SilentlyContinue) {
+            Write-Error "FAIL: quectoclaw binary still exists"
+            exit 1
+          }
+          Write-Host "PASS: QuectoClaw binary removed"
+
+  # ============================================================
   # WorkBuddy — real npm install → scan → uninstall → verify
   # ============================================================
   e2e-workbuddy:

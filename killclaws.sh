@@ -200,6 +200,8 @@ FOUND_WORKBUDDY=0; DETAILS_WORKBUDDY=""; SIZEKB_WORKBUDDY=0; PIDS_WORKBUDDY=""
 FOUND_ZEROCLAW=0; DETAILS_ZEROCLAW=""; SIZEKB_ZEROCLAW=0; PIDS_ZEROCLAW=""; BIN_ZEROCLAW=""
 FOUND_PICOCLAW=0; DETAILS_PICOCLAW=""; SIZEKB_PICOCLAW=0; PIDS_PICOCLAW=""; BIN_PICOCLAW=""
 FOUND_KIMICLI=0; DETAILS_KIMICLI=""; SIZEKB_KIMICLI=0; BIN_KIMI=""; HAS_PIP_KIMI=0; HAS_PIP3_KIMI=0
+FOUND_CLAWCODER=0; DETAILS_CLAWCODER=""; SIZEKB_CLAWCODER=0; PIDS_CLAWCODER=""; BIN_CLAWCODE=""; BIN_CLAWCODER=""; HAS_PIP_CLAWCODER=0; HAS_PIP3_CLAWCODER=0
+FOUND_QUECTOCLAW=0; DETAILS_QUECTOCLAW=""; SIZEKB_QUECTOCLAW=0; PIDS_QUECTOCLAW=""; BIN_QUECTOCLAW=""; HAS_BREW_QUECTOCLAW=0
 
 detect_openclaw() {
   local p s pids
@@ -435,6 +437,80 @@ detect_kimicli() {
   fi
 }
 
+detect_clawcoder() {
+  local p pids
+  p="$HOME/.clawcoder"
+  if [ -d "$p" ]; then
+    FOUND_CLAWCODER=1
+    append_detail DETAILS_CLAWCODER "      📂 ~/.clawcoder ($(path_size_human "$p"))"
+    add_kb SIZEKB_CLAWCODER "$(path_size_kb "$p")"
+  fi
+
+  if command_exists pip && pip show clawcoder >/dev/null 2>&1; then
+    FOUND_CLAWCODER=1
+    HAS_PIP_CLAWCODER=1
+    append_detail DETAILS_CLAWCODER "      📦 pip: clawcoder"
+  fi
+  if command_exists pip3 && pip3 show clawcoder >/dev/null 2>&1; then
+    FOUND_CLAWCODER=1
+    HAS_PIP3_CLAWCODER=1
+    append_detail DETAILS_CLAWCODER "      📦 pip3: clawcoder"
+  fi
+
+  if command_exists clawcode; then
+    FOUND_CLAWCODER=1
+    BIN_CLAWCODE="$(command -v clawcode 2>/dev/null || true)"
+    append_detail DETAILS_CLAWCODER "      🔧 Binary: $BIN_CLAWCODE"
+  fi
+  if command_exists clawcoder; then
+    FOUND_CLAWCODER=1
+    BIN_CLAWCODER="$(command -v clawcoder 2>/dev/null || true)"
+    if [ -n "$BIN_CLAWCODER" ] && [ "$BIN_CLAWCODER" != "$BIN_CLAWCODE" ]; then
+      append_detail DETAILS_CLAWCODER "      🔧 Binary: $BIN_CLAWCODER"
+    fi
+  fi
+
+  pids="$(collect_pids "clawcode clawcoder")"
+  if [ -n "$pids" ]; then
+    FOUND_CLAWCODER=1
+    PIDS_CLAWCODER="$pids"
+    for p in $pids; do
+      append_detail DETAILS_CLAWCODER "      🔄 Process: clawcoder (PID $p)"
+    done
+  fi
+}
+
+detect_quectoclaw() {
+  local p pids
+  p="$HOME/.quectoclaw"
+  if [ -d "$p" ]; then
+    FOUND_QUECTOCLAW=1
+    append_detail DETAILS_QUECTOCLAW "      📂 ~/.quectoclaw ($(path_size_human "$p"))"
+    add_kb SIZEKB_QUECTOCLAW "$(path_size_kb "$p")"
+  fi
+
+  if command_exists quectoclaw; then
+    FOUND_QUECTOCLAW=1
+    BIN_QUECTOCLAW="$(command -v quectoclaw 2>/dev/null || true)"
+    append_detail DETAILS_QUECTOCLAW "      🔧 Binary: $BIN_QUECTOCLAW"
+  fi
+
+  if command_exists brew && brew list --formula 2>/dev/null | grep -qx "quectoclaw"; then
+    FOUND_QUECTOCLAW=1
+    HAS_BREW_QUECTOCLAW=1
+    append_detail DETAILS_QUECTOCLAW "      📦 brew: quectoclaw"
+  fi
+
+  pids="$(collect_pids "quectoclaw")"
+  if [ -n "$pids" ]; then
+    FOUND_QUECTOCLAW=1
+    PIDS_QUECTOCLAW="$pids"
+    for p in $pids; do
+      append_detail DETAILS_QUECTOCLAW "      🔄 Process: quectoclaw (PID $p)"
+    done
+  fi
+}
+
 remove_openclaw() {
   local pid
   printf "%b\n" "${BOLD}Removing OpenClaw...${NC}"
@@ -559,6 +635,42 @@ remove_kimicli() {
   fi
 }
 
+remove_clawcoder() {
+  local pid
+  printf "%b\n" "${BOLD}Removing ClawCoder...${NC}"
+  for pid in $PIDS_CLAWCODER; do
+    kill_pid_gracefully "$pid" "clawcoder"
+  done
+  if [ "$HAS_PIP_CLAWCODER" -eq 1 ] && command_exists pip; then
+    run_or_preview "Uninstalled pip package: clawcoder" "pip uninstall -y clawcoder" || true
+  fi
+  if [ "$HAS_PIP3_CLAWCODER" -eq 1 ] && command_exists pip3; then
+    run_or_preview "Uninstalled pip3 package: clawcoder" "pip3 uninstall -y clawcoder" || true
+  fi
+  remove_path "$HOME/.clawcoder" "~/.clawcoder"
+  if [ -n "$BIN_CLAWCODE" ] && [ -e "$BIN_CLAWCODE" ]; then
+    remove_path "$BIN_CLAWCODE" "$BIN_CLAWCODE"
+  fi
+  if [ -n "$BIN_CLAWCODER" ] && [ -e "$BIN_CLAWCODER" ] && [ "$BIN_CLAWCODER" != "$BIN_CLAWCODE" ]; then
+    remove_path "$BIN_CLAWCODER" "$BIN_CLAWCODER"
+  fi
+}
+
+remove_quectoclaw() {
+  local pid
+  printf "%b\n" "${BOLD}Removing QuectoClaw...${NC}"
+  for pid in $PIDS_QUECTOCLAW; do
+    kill_pid_gracefully "$pid" "quectoclaw"
+  done
+  if [ "$HAS_BREW_QUECTOCLAW" -eq 1 ] && command_exists brew; then
+    run_or_preview "Uninstalled Homebrew formula: quectoclaw" "brew uninstall --force quectoclaw" || true
+  fi
+  remove_path "$HOME/.quectoclaw" "~/.quectoclaw"
+  if [ -n "$BIN_QUECTOCLAW" ] && [ -e "$BIN_QUECTOCLAW" ]; then
+    remove_path "$BIN_QUECTOCLAW" "$BIN_QUECTOCLAW"
+  fi
+}
+
 print_found_products() {
   local count idx
   count=0
@@ -582,6 +694,12 @@ print_found_products() {
   if [ "$FOUND_KIMICLI" -eq 1 ]; then
     count=$((count + 1)); eval "IDX_$count=KIMICLI"; FOUND_KEYS="$FOUND_KEYS KIMICLI"
   fi
+  if [ "$FOUND_CLAWCODER" -eq 1 ]; then
+    count=$((count + 1)); eval "IDX_$count=CLAWCODER"; FOUND_KEYS="$FOUND_KEYS CLAWCODER"
+  fi
+  if [ "$FOUND_QUECTOCLAW" -eq 1 ]; then
+    count=$((count + 1)); eval "IDX_$count=QUECTOCLAW"; FOUND_KEYS="$FOUND_KEYS QUECTOCLAW"
+  fi
 
   FOUND_COUNT="$count"
 
@@ -603,6 +721,8 @@ print_found_products() {
       ZEROCLAW) name="ZeroClaw"; details="$DETAILS_ZEROCLAW" ;;
       PICOCLAW) name="PicoClaw"; details="$DETAILS_PICOCLAW" ;;
       KIMICLI) name="KimiCLI"; details="$DETAILS_KIMICLI" ;;
+      CLAWCODER) name="ClawCoder"; details="$DETAILS_CLAWCODER" ;;
+      QUECTOCLAW) name="QuectoClaw"; details="$DETAILS_QUECTOCLAW" ;;
       *) name="$key"; details="" ;;
     esac
 
@@ -715,6 +835,16 @@ remove_selected() {
         removed_count=$((removed_count + 1))
         freed_kb=$((freed_kb + SIZEKB_KIMICLI))
         ;;
+      CLAWCODER)
+        remove_clawcoder
+        removed_count=$((removed_count + 1))
+        freed_kb=$((freed_kb + SIZEKB_CLAWCODER))
+        ;;
+      QUECTOCLAW)
+        remove_quectoclaw
+        removed_count=$((removed_count + 1))
+        freed_kb=$((freed_kb + SIZEKB_QUECTOCLAW))
+        ;;
     esac
     printf "\n"
   done
@@ -761,6 +891,8 @@ main() {
   detect_zeroclaw
   detect_picoclaw
   detect_kimicli
+  detect_clawcoder
+  detect_quectoclaw
 
   print_found_products
 

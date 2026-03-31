@@ -68,6 +68,53 @@ function Remove-PathSafe($path) {
     }
 }
 
+function Remove-UserPathEntry($entry) {
+    if ([string]::IsNullOrWhiteSpace($entry)) { return }
+
+    try {
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment", $true)
+        if ($null -eq $key) { return }
+
+        $currentPath = $key.GetValue("Path", "", [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+        if ([string]::IsNullOrWhiteSpace($currentPath)) {
+            $key.Close()
+            return
+        }
+
+        $normalizedEntry = $entry.Trim().TrimEnd("\").ToLowerInvariant()
+        $segments = @()
+        $removed = $false
+
+        foreach ($segment in ($currentPath -split ";")) {
+            if ([string]::IsNullOrWhiteSpace($segment)) { continue }
+            $trimmedSegment = $segment.Trim()
+            $normalizedSegment = $trimmedSegment.TrimEnd("\").ToLowerInvariant()
+            if ($normalizedSegment -eq $normalizedEntry) {
+                $removed = $true
+                continue
+            }
+            $segments += $trimmedSegment
+        }
+
+        if ($removed) {
+            if ($DryRun) {
+                Write-Ok "`[dry-run`] Would remove PATH entry: $entry"
+            } else {
+                $newPath = $segments -join ";"
+                $key.SetValue("Path", $newPath, [Microsoft.Win32.RegistryValueKind]::ExpandString)
+                $env:Path = ($env:Path -split ";" | Where-Object {
+                    -not [string]::IsNullOrWhiteSpace($_) -and $_.Trim().TrimEnd("\").ToLowerInvariant() -ne $normalizedEntry
+                }) -join ";"
+                Write-Ok "Removed PATH entry: $entry"
+            }
+        }
+
+        $key.Close()
+    } catch {
+        Write-Warn "Failed to update PATH for $entry"
+    }
+}
+
 # ── Detection ───────────────────────────────────────────────────────
 # Returns hashtable: @{ Found=$true; Details=@("line1","line2") }
 
@@ -305,6 +352,90 @@ function Detect-KimiCLI {
     return @{ Found=$found; Details=$details }
 }
 
+function Detect-ClawCoder {
+    $found = $false
+    $details = @()
+    $userHome = $env:USERPROFILE
+
+    if (Test-Path "$userHome\.clawcoder") {
+        $sz = Get-DirSizeHuman "$userHome\.clawcoder"
+        $details += "      dir  ~\.clawcoder ($sz)"
+        $found = $true
+    }
+
+    foreach ($pip in @("pip3", "pip")) {
+        if (Test-CmdExists $pip) {
+            try {
+                $out = & $pip show clawcoder 2>$null
+                if ($LASTEXITCODE -eq 0 -and $out) {
+                    $details += "      pkg  ${pip}: clawcoder"
+                    $found = $true
+                }
+            } catch {
+                # Command failed — ignore
+            }
+        }
+    }
+
+    $bins = @()
+    foreach ($cmd in @("clawcode", "clawcoder")) {
+        if (Test-CmdExists $cmd) {
+            $bin = (Get-Command $cmd).Source
+            if ($bin -and ($bins -notcontains $bin)) {
+                $details += "      bin  $bin"
+                $bins += $bin
+                $found = $true
+            }
+        }
+    }
+
+    $procs = @()
+    foreach ($pattern in @("*clawcode*", "*clawcoder*")) {
+        $procs += Get-Process -Name $pattern -ErrorAction SilentlyContinue
+    }
+    $procs = $procs | Sort-Object Id -Unique
+    if ($procs) {
+        $pids = ($procs | ForEach-Object { $_.Id }) -join ","
+        $details += "      proc clawcoder (PID $pids)"
+        $found = $true
+    }
+
+    if (Test-Path "$env:LOCALAPPDATA\ClawCoder") {
+        $sz = Get-DirSizeHuman "$env:LOCALAPPDATA\ClawCoder"
+        $details += "      dir  $env:LOCALAPPDATA\ClawCoder ($sz)"
+        $found = $true
+    }
+
+    return @{ Found=$found; Details=$details }
+}
+
+function Detect-QuectoClaw {
+    $found = $false
+    $details = @()
+    $userHome = $env:USERPROFILE
+
+    if (Test-Path "$userHome\.quectoclaw") {
+        $sz = Get-DirSizeHuman "$userHome\.quectoclaw"
+        $details += "      dir  ~\.quectoclaw ($sz)"
+        $found = $true
+    }
+
+    if (Test-CmdExists "quectoclaw") {
+        $bin = (Get-Command quectoclaw).Source
+        $details += "      bin  $bin"
+        $found = $true
+    }
+
+    $procs = Get-Process -Name "*quectoclaw*" -ErrorAction SilentlyContinue
+    if ($procs) {
+        $pids = ($procs | ForEach-Object { $_.Id }) -join ","
+        $details += "      proc quectoclaw (PID $pids)"
+        $found = $true
+    }
+
+    return @{ Found=$found; Details=$details }
+}
+
 # ── Removal ─────────────────────────────────────────────────────────
 
 function Remove-OpenClaw {
@@ -459,6 +590,71 @@ function Remove-KimiCLI {
     }
 }
 
+function Remove-ClawCoder {
+    Write-Host "`n  Removing ClawCoder..." -ForegroundColor White
+    Stop-ProcessByName "clawcode" | Out-Null
+    Stop-ProcessByName "clawcoder" | Out-Null
+
+    foreach ($pip in @("pip3", "pip")) {
+        if (Test-CmdExists $pip) {
+            try {
+                $out = & $pip show clawcoder 2>$null
+                if ($LASTEXITCODE -eq 0 -and $out) {
+                    if ($DryRun) {
+                        Write-Ok "`[dry-run`] Would uninstall: $pip uninstall -y clawcoder"
+                    } else {
+                        & $pip uninstall -y clawcoder 2>$null
+                        Write-Ok "Uninstalled $pip package: clawcoder"
+                    }
+                }
+            } catch {
+                # Command failed — ignore
+            }
+        }
+    }
+
+    $bins = @()
+    foreach ($cmd in @("clawcode", "clawcoder")) {
+        if (Test-CmdExists $cmd) {
+            $bin = (Get-Command $cmd).Source
+            if ($bin -and ($bins -notcontains $bin) -and (Test-Path $bin)) {
+                $bins += $bin
+                if ($DryRun) {
+                    Write-Ok "`[dry-run`] Would remove binary: $bin"
+                } else {
+                    Remove-Item $bin -Force -ErrorAction SilentlyContinue
+                    Write-Ok "Removed binary: $bin"
+                }
+            }
+        }
+    }
+
+    $installDir = "$env:LOCALAPPDATA\ClawCoder"
+    if (Test-Path $installDir) {
+        Remove-UserPathEntry "$installDir\bin"
+    }
+
+    Remove-PathSafe "$env:USERPROFILE\.clawcoder"
+    Remove-PathSafe $installDir
+    Remove-PathSafe "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\ClawCoder"
+    Remove-PathSafe "$env:USERPROFILE\Desktop\ClawCoder.lnk"
+}
+
+function Remove-QuectoClaw {
+    Write-Host "`n  Removing QuectoClaw..." -ForegroundColor White
+    Stop-ProcessByName "quectoclaw" | Out-Null
+    Remove-PathSafe "$env:USERPROFILE\.quectoclaw"
+    if (Test-CmdExists "quectoclaw") {
+        $bin = (Get-Command quectoclaw).Source
+        if ($DryRun) {
+            Write-Ok "`[dry-run`] Would remove binary: $bin"
+        } else {
+            Remove-Item $bin -Force -ErrorAction SilentlyContinue
+            Write-Ok "Removed binary: $bin"
+        }
+    }
+}
+
 # ── Main ────────────────────────────────────────────────────────────
 
 if ($Help) {
@@ -500,7 +696,9 @@ $products = @(
     @{ Name="WorkBuddy"; Detect={ Detect-WorkBuddy }; Remove={ Remove-WorkBuddy } },
     @{ Name="ZeroClaw";  Detect={ Detect-ZeroClaw };  Remove={ Remove-ZeroClaw } },
     @{ Name="PicoClaw";  Detect={ Detect-PicoClaw };  Remove={ Remove-PicoClaw } },
-    @{ Name="KimiCLI";   Detect={ Detect-KimiCLI };   Remove={ Remove-KimiCLI } }
+    @{ Name="KimiCLI";   Detect={ Detect-KimiCLI };   Remove={ Remove-KimiCLI } },
+    @{ Name="ClawCoder"; Detect={ Detect-ClawCoder }; Remove={ Remove-ClawCoder } },
+    @{ Name="QuectoClaw"; Detect={ Detect-QuectoClaw }; Remove={ Remove-QuectoClaw } }
 )
 
 $detected = @()
